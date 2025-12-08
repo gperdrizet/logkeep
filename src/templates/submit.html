@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Submit Link - LogKeep{% endblock %}
+
+{% block content %}
+<h2>Submit Link</h2>
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
+{% if success %}
+<div class="alert alert-success">
+    {{ success }}
+</div>
+{% endif %}
+
+<div class="card">
+    <form action="/submit" method="post">
+        <div class="form-group">
+            <label for="url">URL</label>
+            <input type="url" id="url" name="url" placeholder="https://example.com/article" required autofocus>
+            <small style="color: #6b7280;">Link will be automatically processed and added to your Logseq journal</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="title">Title (Optional)</label>
+            <input type="text" id="title" name="title" placeholder="Leave blank for automatic extraction" maxlength="500">
+            <small style="color: #6b7280;">If left blank, we'll try to extract the title automatically</small>
+        </div>
+        
+        <div class="form-group">
+            <label for="tags">Tags</label>
+            <input type="text" id="tags" name="tags" placeholder="Start typing to search tags..." list="tag-list">
+            <datalist id="tag-list">
+                {% for tag in user_tags %}
+                <option value="{{ tag }}">
+                {% endfor %}
+            </datalist>
+            <small style="color: #6b7280;">
+                Select tags from your collection. 
+                <a href="/tags" style="color: #2563eb;">Manage tags</a>
+            </small>
+        </div>
+        
+        <div id="selected-tags" class="link-tags" style="margin-bottom: 16px;"></div>
+        
+        <input type="hidden" id="tags-hidden" name="tags_json" value="[]">
+        
+        <button type="submit" class="btn btn-primary">Submit Link</button>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Tag selection with datalist
+const tagsInput = document.getElementById('tags');
+const selectedTagsDiv = document.getElementById('selected-tags');
+const tagsHidden = document.getElementById('tags-hidden');
+let selectedTags = [];
+
+tagsInput.addEventListener('change', function() {
+    const tag = this.value.trim();
+    if (tag && !selectedTags.includes(tag)) {
+        selectedTags.push(tag);
+        updateSelectedTags();
+    }
+    this.value = '';
+});
+
+function updateSelectedTags() {
+    selectedTagsDiv.innerHTML = selectedTags.map(tag => 
+        `<span class="tag">
+            #${tag}
+            <button type="button" onclick="removeTag('${tag}')" style="background: none; border: none; color: inherit; cursor: pointer; margin-left: 4px;">×</button>
+        </span>`
+    ).join('');
+    tagsHidden.value = JSON.stringify(selectedTags);
+}
+
+function removeTag(tag) {
+    selectedTags = selectedTags.filter(t => t !== tag);
+    updateSelectedTags();
+}
+</script>
+{% endblock %}

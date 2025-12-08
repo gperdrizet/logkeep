@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - LogKeep{% endblock %}
+
+{% block content %}
+<h2>Recent Submissions</h2>
+
+{% if success %}
+<div class="alert alert-success">
+    {{ success }}
+</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
+{% if links %}
+    {% for link in links %}
+    <div class="link-item">
+        <div class="link-header">
+            <div class="link-title">
+                {% if link.title %}
+                    {{ link.title }}
+                {% else %}
+                    <em style="color: #9ca3af;">No title</em>
+                {% endif %}
+            </div>
+            <span class="status-badge status-{{ link.status }}">
+                {{ link.status.replace('_', ' ') }}
+            </span>
+        </div>
+        
+        <div class="link-url">
+            <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.url[:80] }}{% if link.url|length > 80 %}...{% endif %}</a>
+        </div>
+        
+        {% if link.selected_tags %}
+        <div class="link-tags">
+            {% for tag in link.selected_tags %}
+            <span class="tag">#{{ tag }}</span>
+            {% endfor %}
+        </div>
+        {% endif %}
+        
+        <div class="link-meta">
+            Submitted {{ link.submitted_at.strftime('%Y-%m-%d %H:%M') }}
+            {% if link.processed_at %}
+            • Processed {{ link.processed_at.strftime('%Y-%m-%d %H:%M') }}
+            {% endif %}
+            {% if link.retry_count > 0 %}
+            • Retries: {{ link.retry_count }}
+            {% endif %}
+        </div>
+        
+        {% if link.error_message %}
+        <div class="alert alert-error" style="margin-top: 8px; padding: 8px;">
+            <strong>Error:</strong> {{ link.error_message }}
+        </div>
+        {% endif %}
+        
+        {% if link.status == 'needs_title' %}
+        <form action="/links/{{ link.id }}/title" method="post" style="margin-top: 12px;">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label for="title-{{ link.id }}">Provide Title</label>
+                <input type="text" id="title-{{ link.id }}" name="title" placeholder="Enter title for this link" required>
+            </div>
+            <button type="submit" class="btn btn-success btn-small">Submit Title</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="empty-state">
+        <div class="empty-state-icon">📭</div>
+        <p>No links submitted yet.</p>
+        <p><a href="/submit" class="btn btn-primary" style="margin-top: 16px;">Submit Your First Link</a></p>
+    </div>
+{% endif %}
+{% endblock %}

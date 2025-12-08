@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Login - LogKeep{% endblock %}
+
+{% block content %}
+<div style="max-width: 400px; margin: 40px auto;">
+    <div class="card">
+        <h2 class="card-title text-center">📚 LogKeep</h2>
+        <p class="text-center" style="color: #6b7280; margin-bottom: 24px;">
+            Curate content from links using Logseq & GitHub
+        </p>
+        
+        {% if error %}
+        <div class="alert alert-error">
+            {{ error }}
+        </div>
+        {% endif %}
+        
+        <form action="/login" method="post">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" required autofocus>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+        
+        <div style="text-align: center; margin-top: 16px;">
+            <a href="/register" style="color: #2563eb;">Don't have an account? Register</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

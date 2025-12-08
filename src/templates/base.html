@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>{% block title %}LogKeep{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% if user %}
+    <header>
+        <div class="container">
+            <h1>📚 LogKeep</h1>
+            <div class="user-info">
+                {{ user.username }} → {{ user.repo_owner }}/{{ user.repo_name }}
+            </div>
+            <nav>
+                <a href="/dashboard">Dashboard</a>
+                <a href="/submit">Submit Link</a>
+                <a href="/tags">Tags</a>
+                <form action="/logout" method="post" style="display: inline;">
+                    <button type="submit">Logout</button>
+                </form>
+            </nav>
+        </div>
+    </header>
+    {% endif %}
+    
+    <main class="container">
+        {% block content %}{% endblock %}
+    </main>
+    
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>
