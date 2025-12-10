@@ -14,7 +14,7 @@ class Invite(Base):
     code = Column(String(36), unique=True, nullable=False, index=True, default=lambda: str(uuid.uuid4()))
     created_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     used_by_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, unique=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
     used_at = Column(DateTime, nullable=True)
 
     # Relationships

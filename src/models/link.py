@@ -15,10 +15,10 @@ class Link(Base):
     url = Column(Text, nullable=False)
     title = Column(String(500), nullable=True)  # Nullable until extracted/provided
     selected_tags = Column(JSON, nullable=False, default=list)  # Array of selected tag strings
-    status = Column(SQLEnum(LinkStatus), nullable=False, default=LinkStatus.PENDING, index=True)
+    status = Column(SQLEnum(LinkStatus), nullable=False, default=LinkStatus.PENDING)
     retry_count = Column(Integer, nullable=False, default=0)
     error_message = Column(Text, nullable=True)
-    submitted_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    submitted_at = Column(DateTime, default=datetime.now, nullable=False)
     processed_at = Column(DateTime, nullable=True)
 
     # Relationships

@@ -28,8 +28,8 @@
                     <em style="color: #9ca3af;">No title</em>
                 {% endif %}
             </div>
-            <span class="status-badge status-{{ link.status }}">
-                {{ link.status.replace('_', ' ') }}
+            <span class="status-badge status-{{ link.status.value }}">
+                {{ link.status.value.replace('_', ' ') }}
             </span>
         </div>
         
@@ -46,9 +46,9 @@
         {% endif %}
         
         <div class="link-meta">
-            Submitted {{ link.submitted_at.strftime('%Y-%m-%d %H:%M') }}
+            Submitted {{ link.submitted_at.strftime('%Y-%m-%d %I:%M %p') }}
             {% if link.processed_at %}
-            • Processed {{ link.processed_at.strftime('%Y-%m-%d %H:%M') }}
+            • Processed {{ link.processed_at.strftime('%Y-%m-%d %I:%M %p') }}
             {% endif %}
             {% if link.retry_count > 0 %}
             • Retries: {{ link.retry_count }}
@@ -61,7 +61,7 @@
         </div>
         {% endif %}
         
-        {% if link.status == 'needs_title' %}
+        {% if link.status.value == 'needs_title' %}
         <form action="/links/{{ link.id }}/title" method="post" style="margin-top: 12px;">
             <div class="form-group" style="margin-bottom: 12px;">
                 <label for="title-{{ link.id }}">Provide Title</label>
@@ -79,4 +79,20 @@
         <p><a href="/submit" class="btn btn-primary" style="margin-top: 16px;">Submit Your First Link</a></p>
     </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Auto-refresh if there are pending or processing links
+    (function() {
+        const hasPendingOrProcessing = document.querySelectorAll('.status-pending, .status-processing').length > 0;
+        
+        if (hasPendingOrProcessing) {
+            // Refresh every 5 seconds when there are links being processed
+            setTimeout(function() {
+                window.location.reload();
+            }, 5000);
+        }
+    })();
+</script>
 {% endblock %}

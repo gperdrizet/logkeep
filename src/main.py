@@ -2,7 +2,7 @@
 import os
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import FastAPI, Request, Depends, Form, HTTPException, status
+from fastapi import FastAPI, Request, Depends, Form, HTTPException, status, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -15,7 +15,7 @@ from src.models.user import User
 from src.models.link import Link
 from src.models.invite import Invite
 from src.utils.database import get_db, SessionLocal
-from src.utils.auth import get_current_user_optional, verify_password, create_access_token, get_password_hash
+from src.utils.auth import get_current_user, get_current_user_optional, verify_password, create_access_token, get_password_hash
 from src.utils.encryption import encrypt_token
 from src.utils.logging import logger
 from src.services.processor import process_link
@@ -52,7 +52,7 @@ async def startup_event():
     db = SessionLocal()
     try:
         # Find links that have been processing for more than 5 minutes
-        stale_threshold = datetime.utcnow() - timedelta(minutes=5)
+        stale_threshold = datetime.now() - timedelta(minutes=5)
         
         stale_links = db.query(Link).filter(
             Link.status == LinkStatus.PROCESSING,
@@ -68,6 +68,32 @@ async def startup_event():
             db.commit()
             logger.info(f"Reset {len(stale_links)} stale processing task(s)")
         
+        # Process any pending links
+        pending_links = db.query(Link).filter(
+            Link.status == LinkStatus.PENDING,
+            Link.retry_count < 3
+        ).all()
+        
+        if pending_links:
+            logger.info(f"Found {len(pending_links)} pending link(s), queueing for processing")
+            # We can't use BackgroundTasks during startup, so we'll process them directly
+            # in a non-blocking way by importing the function
+            import asyncio
+            from concurrent.futures import ThreadPoolExecutor
+            
+            async def process_pending():
+                with ThreadPoolExecutor(max_workers=3) as executor:
+                    loop = asyncio.get_event_loop()
+                    tasks = [
+                        loop.run_in_executor(executor, process_link, link.id)
+                        for link in pending_links
+                    ]
+                    await asyncio.gather(*tasks)
+            
+            # Schedule for processing
+            asyncio.create_task(process_pending())
+            logger.info(f"Scheduled {len(pending_links)} pending link(s) for background processing")
+            
     except Exception as e:
         logger.error(f"Error during startup recovery: {str(e)}")
         db.rollback()
@@ -127,7 +153,7 @@ async def login_submit(
         )
     
     # Create session token
-    access_token = create_access_token(data={"sub": user.id})
+    access_token = create_access_token(data={"sub": str(user.id)})
     
     # Redirect to dashboard with cookie
     response = RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
@@ -136,7 +162,8 @@ async def login_submit(
         value=access_token,
         httponly=True,
         max_age=60 * 60 * 24 * 7,  # 7 days
-        samesite="lax"
+        samesite="lax",
+        secure=False  # Set to True in production with HTTPS
     )
     
     logger.info(f"User logged in: {user.username}")
@@ -197,7 +224,7 @@ async def register_submit(
         
         # Mark invite as used
         invite.used_by_user_id = user.id
-        invite.used_at = datetime.utcnow()
+        invite.used_at = datetime.now()
         
         db.commit()
         
@@ -264,6 +291,7 @@ async def submit_page(
 @app.post("/submit")
 async def submit_link(
     request: Request,
+    background_tasks: BackgroundTasks,
     url: str = Form(...),
     title: Optional[str] = Form(None),
     tags_json: str = Form("[]"),
@@ -322,10 +350,8 @@ async def submit_link(
     
     logger.info(f"Link submitted by {current_user.username}: {url} (ID: {link.id})")
     
-    # Process in background (would use BackgroundTasks in production)
-    # For now, we'll just queue it
-    from fastapi import BackgroundTasks
-    # Note: This is a simplified version - in production, use proper background task handling
+    # Process in background
+    background_tasks.add_task(process_link, link.id)
     
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
 
@@ -418,6 +444,9 @@ async def add_tag(
         )
     
     current_user.tags.append(tag)
+    # Mark the attribute as modified for SQLAlchemy to detect the change
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(current_user, "tags")
     db.commit()
     
     logger.info(f"Tag added by {current_user.username}: {tag}")
@@ -436,6 +465,9 @@ async def delete_tag(
     
     if tag in current_user.tags:
         current_user.tags.remove(tag)
+        # Mark the attribute as modified for SQLAlchemy to detect the change
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(current_user, "tags")
         db.commit()
         logger.info(f"Tag deleted by {current_user.username}: {tag}")
     

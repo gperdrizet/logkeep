@@ -1,6 +1,6 @@
 """User model."""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON, Text
 from sqlalchemy.orm import relationship
 from src.models import Base
 
@@ -17,7 +17,7 @@ class User(Base):
     repo_name = Column(String(255), nullable=False)
     tags = Column(JSON, nullable=False, default=list)  # Array of tag strings
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
 
     # Relationships
     links = relationship("Link", back_populates="user", cascade="all, delete-orphan")

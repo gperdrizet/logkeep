@@ -128,7 +128,7 @@ def check_duplicate_url(db: Session, user_id: int, url: str) -> bool:
     return existing is not None
 
 
-def process_link(link_id: int, db: Session) -> None:
+def process_link(link_id: int) -> None:
     """
     Process a link: extract title and update status.
     
@@ -137,8 +137,10 @@ def process_link(link_id: int, db: Session) -> None:
     
     Args:
         link_id: Link ID to process
-        db: Database session
     """
+    from src.utils.database import SessionLocal
+    
+    db = SessionLocal()
     try:
         # Get link
         link = db.query(Link).filter(Link.id == link_id).first()
@@ -175,7 +177,7 @@ def process_link(link_id: int, db: Session) -> None:
         
         if success:
             link.status = LinkStatus.COMPLETED
-            link.processed_at = datetime.utcnow()
+            link.processed_at = datetime.now()
             link.error_message = None
             db.commit()
             logger.info(f"Link {link_id} processed successfully")
@@ -211,3 +213,5 @@ def process_link(link_id: int, db: Session) -> None:
                 db.commit()
         except:
             pass
+    finally:
+        db.close()

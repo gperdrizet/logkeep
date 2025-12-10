@@ -1,6 +1,6 @@
 # LogKeep
 
-📚 Curate content from links using Logseq & GitHub
+Curate content from links using Logseq & GitHub
 
 ## Overview
 
@@ -8,17 +8,17 @@ LogKeep is a self-hosted multi-user web service that helps you curate content fr
 
 ## Features
 
-- 📱 **Mobile-First Design** - Large tap targets, minimal typing, optimized for smartphone use
-- 🔐 **Invite-Only System** - Controlled user registration with invite codes
-- 🏷️ **Tag Management** - Personal tag collections with autocomplete
-- 🔄 **Async Processing** - Background link processing with automatic title extraction
-- 📝 **Auto Title Extraction** - Automatic content extraction with manual fallback
-- 🔒 **Secure** - Encrypted GitHub token storage, session-based authentication
-- 🔁 **Retry Logic** - Automatic retry on transient failures (up to 3 attempts)
-- 📊 **Status Tracking** - Real-time visibility into link processing status
-- 🛠️ **Admin CLI** - Command-line tools for user and system management
+- **Mobile-first design** - Large tap targets, minimal typing, optimized for smartphone use
+- **Invite-only system** - Controlled user registration with invite codes
+- **Tag management** - Personal tag collections with autocomplete
+- **Async processing** - Background link processing with automatic title extraction
+- **Auto title extraction** - Automatic content extraction with manual fallback
+- **Secure** - Encrypted GitHub token storage, session-based authentication
+- **Retry logic** - Automatic retry on transient failures (up to 3 attempts)
+- **Status tracking** - Real-time visibility into link processing status
+- **Admin CLI** - Command-line tools for user and system management
 
-## Quick Start
+## Quick start
 
 ### Prerequisites
 
@@ -26,7 +26,7 @@ LogKeep is a self-hosted multi-user web service that helps you curate content fr
 - GitHub Personal Access Token with `repo` scope
 - Logseq graph in a GitHub repository
 
-### Local Development
+### Local development
 
 ```bash
 # Clone repository
@@ -66,7 +66,7 @@ uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 
 Visit `http://localhost:8000` in your browser.
 
-### Docker Deployment
+### Docker deployment
 
 ```bash
 # Create .env file with production values
@@ -91,7 +91,7 @@ docker-compose logs -f app
 
 ## Configuration
 
-### Environment Variables
+### Environment variables
 
 Create a `.env` file with:
 
@@ -113,7 +113,7 @@ MAX_RETRY_COUNT=3
 LOG_LEVEL=INFO
 ```
 
-### GitHub Setup
+### GitHub setup
 
 Users need a GitHub Personal Access Token:
 
@@ -125,9 +125,9 @@ Users need a GitHub Personal Access Token:
 6. Copy token immediately (shown only once)
 7. Provide during user registration or creation
 
-## CLI Commands
+## CLI commands
 
-### Database Management
+### Database management
 
 ```bash
 # Initialize database
@@ -137,7 +137,7 @@ python -m src.cli.admin init-db
 python -m src.cli.admin generate-key
 ```
 
-### User Management
+### User management
 
 ```bash
 # Create user
@@ -154,7 +154,7 @@ python -m src.cli.admin deactivate-user USERNAME
 python -m src.cli.admin test-github USERNAME
 ```
 
-### Invite Management
+### Invite management
 
 ```bash
 # Generate invite codes
@@ -177,7 +177,7 @@ python -m src.cli.admin view-failed-links --username alice --limit 10
 python -m src.cli.admin retry-failed alice
 ```
 
-## Production Deployment (VPS)
+## Production deployment (VPS)
 
 ### 1. Install Docker
 
@@ -187,7 +187,7 @@ sudo sh get-docker.sh
 sudo apt install docker-compose
 ```
 
-### 2. Setup Application
+### 2. Setup application
 
 ```bash
 # Clone repository
@@ -207,7 +207,7 @@ docker-compose exec app python -m src.cli.admin create-user
 docker-compose exec app python -m src.cli.admin create-invite --count 5
 ```
 
-### 3. Nginx Reverse Proxy
+### 3. Nginx reverse proxy
 
 Create `/etc/nginx/sites-available/logkeep`:
 
@@ -241,7 +241,7 @@ sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d logkeep.example.com
 ```
 
-### 5. Backup Setup
+### 5. Backup setup
 
 Create backup script `/usr/local/bin/backup-logkeep.sh`:
 
@@ -259,7 +259,7 @@ Add cron job:
 0 2 * * * /usr/local/bin/backup-logkeep.sh
 ```
 
-## User Workflow
+## User workflow
 
 ### 1. Register
 
@@ -269,7 +269,7 @@ Add cron job:
 - Enter GitHub PAT and repository details
 - System creates account
 
-### 2. Submit Links
+### 2. Submit links
 
 - Browse content, find interesting article
 - Visit `/submit`
@@ -278,14 +278,14 @@ Add cron job:
 - Select tags from autocomplete
 - Submit → processed asynchronously
 
-### 3. Monitor Status
+### 3. Monitor status
 
 - Dashboard shows recent 50 submissions
 - Color-coded status: pending, processing, completed, failed
 - View error details for failures
 - Provide title manually if extraction fails
 
-### 4. Manage Tags
+### 4. Manage tags
 
 - Visit `/tags`
 - View current collection
@@ -298,7 +298,7 @@ Add cron job:
 - Navigate to today's journal
 - See entries at bottom: `- [[Title]] [link](url) #links #tag1 #tag2`
 
-## Logseq Entry Format
+## Logseq entry format
 
 All entries follow this standardized format:
 
@@ -347,7 +347,7 @@ Entries are appended to `journals/YYYY_MM_DD.md` in your GitHub repository.
 
 ## Troubleshooting
 
-### Database Issues
+### Database issues
 
 ```bash
 # Check database file
@@ -358,7 +358,7 @@ rm data/logkeep.db
 python -m src.cli.admin init-db
 ```
 
-### GitHub Connection Issues
+### GitHub connection issues
 
 ```bash
 # Test connection
@@ -370,7 +370,7 @@ python -m src.cli.admin test-github USERNAME
 # - No journals/ directory: Will be created on first link
 ```
 
-### Processing Failures
+### Processing failures
 
 ```bash
 # View failed links
@@ -385,7 +385,7 @@ tail -f logs/app.log
 
 ## Development
 
-### Project Structure
+### Project structure
 
 ```
 logkeep/
@@ -405,7 +405,7 @@ logkeep/
 └── requirements.txt
 ```
 
-### Running Tests
+### Running tests
 
 ```bash
 # TODO: Add test suite

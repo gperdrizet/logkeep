@@ -31,8 +31,8 @@ def init_db():
         db_path = DATABASE_URL.replace("sqlite:///", "")
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
     
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
+    # Create all tables (checkfirst=True is default, but making it explicit)
+    Base.metadata.create_all(bind=engine, checkfirst=True)
     print("Database initialized successfully")
 
 

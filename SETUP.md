@@ -4,41 +4,41 @@
 
 The LogKeep application has been fully implemented with all planned features. Here's what was built:
 
-### ✅ Completed Features
+### ✅ Completed features
 
-1. **Project Structure**
+1. **Project structure**
    - Complete src/ directory with organized modules
    - Dockerfile and docker-compose.yml for deployment
    - .env.example with all configuration options
    - Comprehensive .gitignore
 
-2. **Database Layer**
+2. **Database layer**
    - SQLAlchemy models: User, Link, Invite
    - Fernet encryption for GitHub tokens
    - SQLite with proper constraints and indexes
    - Duplicate URL detection per user
 
-3. **Authentication System**
+3. **Authentication system**
    - JWT session-based authentication
    - Bcrypt password hashing
    - HTTP-only cookies for security
    - Invite-only registration
 
-4. **Link Processing**
+4. **Link processing**
    - Async background processing with FastAPI BackgroundTasks
    - Title extraction (trafilatura + BeautifulSoup fallback)
    - Manual title prompt on extraction failure
    - Retry logic (max 3 attempts)
    - Status tracking (pending/processing/needs_title/completed/failed)
 
-5. **GitHub Integration**
+5. **GitHub integration**
    - PyGithub API integration
    - Encrypted token storage
    - Auto-create journal files if missing
    - Standard Logseq format: `- [[Title]] [link](url) #links #tag1 #tag2`
    - Commit entries to journals/YYYY_MM_DD.md
 
-6. **Tag Management**
+6. **Tag management**
    - Per-user tag collections (max 100)
    - HTML5 datalist autocomplete for mobile
    - Add/remove tags via web UI
@@ -72,16 +72,16 @@ The LogKeep application has been fully implemented with all planned features. He
     - Inline code documentation
     - Deployment guides (local, Docker, VPS)
 
-## Next Steps to Get Running
+## Next steps to get running
 
-### 1. Install Dependencies
+### 1. Install dependencies
 
 ```bash
 cd /workspaces/logkeep
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment
+### 2. Configure environment
 
 ```bash
 # Generate encryption key
@@ -96,26 +96,26 @@ nano .env
 # Add the generated keys
 ```
 
-### 3. Initialize Database
+### 3. Initialize database
 
 ```bash
 python -m src.cli.admin init-db
 ```
 
-### 4. Create First User
+### 4. Create first user
 
 ```bash
 python -m src.cli.admin create-user
 # Follow prompts for username, password, GitHub token, repo details
 ```
 
-### 5. Generate Invite Codes
+### 5. Generate invite codes
 
 ```bash
 python -m src.cli.admin create-invite --count 3
 ```
 
-### 6. Run Application
+### 6. Run application
 
 ```bash
 # Development
@@ -133,7 +133,7 @@ Visit http://localhost:8000 and:
 - Check dashboard for status
 - Verify entry in GitHub Logseq repo
 
-## GitHub Personal Access Token Setup
+## GitHub Personal Access Token setup
 
 Your users (and you) will need a GitHub PAT:
 
@@ -143,7 +143,7 @@ Your users (and you) will need a GitHub PAT:
 4. Copy token (shown only once)
 5. Use during registration
 
-## Project File Summary
+## Project file summary
 
 ```
 logkeep/
@@ -185,7 +185,7 @@ logkeep/
 └── .env.example          # Configuration template
 ```
 
-## Key Design Decisions
+## Key design decisions
 
 1. **SQLite over PostgreSQL**: Simpler deployment, sufficient for <1000 users
 2. **FastAPI BackgroundTasks**: No external queue needed (Redis/Celery)
@@ -198,7 +198,7 @@ logkeep/
 9. **3 retry limit**: Balance between recovery and infinite loops
 10. **Mobile-first**: Primary use case drives design
 
-## Testing Checklist
+## Testing checklist
 
 - [ ] User registration with invite code
 - [ ] Login/logout flow
@@ -215,7 +215,7 @@ logkeep/
 - [ ] Test GitHub connection via CLI
 - [ ] Mobile UI responsiveness
 
-## Common Issues & Solutions
+## Common issues & solutions
 
 ### "ENCRYPTION_KEY environment variable not set"
 - Run key generation command from README
@@ -238,7 +238,7 @@ logkeep/
 - User will be prompted to provide title manually
 - Status will show "needs_title"
 
-## Performance Notes
+## Performance notes
 
 - SQLite handles ~1000 concurrent connections
 - Title extraction timeout: 10 seconds
@@ -246,7 +246,7 @@ logkeep/
 - GitHub API rate limit: 5000 requests/hour
 - Session expiry: 7 days
 
-## Security Considerations
+## Security considerations
 
 - All passwords bcrypt hashed (never plaintext)
 - GitHub tokens Fernet encrypted at rest
@@ -270,9 +270,9 @@ logkeep/
 - Check disk usage (database, logs)
 - Update dependencies
 
-## Future Enhancements
+## Future enhancements
 
-See PLAN.md "Future Enhancements" section for roadmap:
+See PLAN.md "Future enhancements" section for roadmap:
 - AI summarization
 - Automatic tag suggestions
 - Browser extension
@@ -290,4 +290,4 @@ See PLAN.md "Future Enhancements" section for roadmap:
 
 **Status**: ✅ Implementation Complete - Ready for Testing
 
-**Next Action**: Install dependencies and test locally
+**Next action**: Install dependencies and test locally

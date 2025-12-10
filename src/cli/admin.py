@@ -26,7 +26,7 @@ def cli():
     pass
 
 
-@cli.command()
+@cli.command('init-db')
 def init_db_cmd():
     """Initialize database tables."""
     try:
@@ -37,7 +37,7 @@ def init_db_cmd():
         sys.exit(1)
 
 
-@cli.command()
+@cli.command('create-user')
 @click.option('--username', prompt=True, help='Username')
 @click.option('--password', prompt=True, hide_input=True, confirmation_prompt=True, help='Password')
 @click.option('--github-token', prompt=True, hide_input=True, help='GitHub Personal Access Token')
@@ -47,6 +47,10 @@ def create_user(username, password, github_token, repo_owner, repo_name):
     """Create a new user."""
     db = SessionLocal()
     try:
+        # Validate password length (bcrypt limit is 72 bytes)
+        if len(password.encode('utf-8')) > 72:
+            click.echo("⚠ Warning: Password longer than 72 bytes will be truncated", err=True)
+        
         # Check if username exists
         existing = db.query(User).filter(User.username == username).first()
         if existing:
@@ -82,7 +86,7 @@ def create_user(username, password, github_token, repo_owner, repo_name):
         db.close()
 
 
-@cli.command()
+@cli.command('create-invite')
 @click.option('--count', default=1, help='Number of invite codes to generate')
 def create_invite(count):
     """Generate invite codes."""
@@ -109,7 +113,7 @@ def create_invite(count):
         db.close()
 
 
-@cli.command()
+@cli.command('list-users')
 def list_users():
     """List all users."""
     db = SessionLocal()
@@ -128,7 +132,7 @@ def list_users():
             click.echo(f"  Repository: {user.repo_owner}/{user.repo_name}")
             click.echo(f"  Tags: {len(user.tags)}")
             click.echo(f"  Status: {status}")
-            click.echo(f"  Created: {user.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+            click.echo(f"  Created: {user.created_at.strftime('%Y-%m-%d %I:%M %p')}")
             click.echo()
         
     except Exception as e:
@@ -138,7 +142,7 @@ def list_users():
         db.close()
 
 
-@cli.command()
+@cli.command('list-invites')
 @click.option('--unused', is_flag=True, help='Show only unused invites')
 def list_invites(unused):
     """List invite codes."""
@@ -159,11 +163,11 @@ def list_invites(unused):
             status = "✓ Unused" if not invite.is_used else "✗ Used"
             click.echo(f"Code: {invite.code}")
             click.echo(f"  Status: {status}")
-            click.echo(f"  Created: {invite.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+            click.echo(f"  Created: {invite.created_at.strftime('%Y-%m-%d %I:%M %p')}")
             if invite.is_used:
                 user = db.query(User).filter(User.id == invite.used_by_user_id).first()
                 click.echo(f"  Used by: {user.username if user else 'Unknown'}")
-                click.echo(f"  Used at: {invite.used_at.strftime('%Y-%m-%d %H:%M:%S')}")
+                click.echo(f"  Used at: {invite.used_at.strftime('%Y-%m-%d %I:%M %p')}")
             click.echo()
         
     except Exception as e:
@@ -173,7 +177,7 @@ def list_invites(unused):
         db.close()
 
 
-@cli.command()
+@cli.command('deactivate-user')
 @click.argument('username')
 def deactivate_user(username):
     """Deactivate a user account."""
@@ -197,7 +201,7 @@ def deactivate_user(username):
         db.close()
 
 
-@cli.command()
+@cli.command('activate-user')
 @click.argument('username')
 def activate_user(username):
     """Activate a user account."""
@@ -221,7 +225,7 @@ def activate_user(username):
         db.close()
 
 
-@cli.command()
+@cli.command('view-failed-links')
 @click.option('--username', help='Filter by username')
 @click.option('--limit', default=10, help='Maximum number of results')
 def view_failed_links(username, limit):
@@ -252,7 +256,7 @@ def view_failed_links(username, limit):
             click.echo(f"  Title: {link.title or 'N/A'}")
             click.echo(f"  Retries: {link.retry_count}")
             click.echo(f"  Error: {link.error_message}")
-            click.echo(f"  Submitted: {link.submitted_at.strftime('%Y-%m-%d %H:%M:%S')}")
+            click.echo(f"  Submitted: {link.submitted_at.strftime('%Y-%m-%d %I:%M %p')}")
             click.echo()
         
     except Exception as e:
@@ -262,7 +266,7 @@ def view_failed_links(username, limit):
         db.close()
 
 
-@cli.command()
+@cli.command('retry-failed')
 @click.argument('username')
 def retry_failed(username):
     """Reset failed links to pending for retry."""
@@ -299,7 +303,7 @@ def retry_failed(username):
         db.close()
 
 
-@cli.command()
+@cli.command('test-github')
 @click.argument('username')
 def test_github(username):
     """Test GitHub connection for a user."""
@@ -329,7 +333,7 @@ def test_github(username):
         db.close()
 
 
-@cli.command()
+@cli.command('generate-key')
 def generate_key():
     """Generate a new Fernet encryption key."""
     key = Fernet.generate_key()

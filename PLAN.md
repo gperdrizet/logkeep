@@ -4,7 +4,7 @@
 
 LogKeep is a self-hosted multi-user web service that allows users to curate content from links using their personal Logseq graphs stored on GitHub. The primary interface is optimized for smartphone use with minimal typing required.
 
-## Core Workflow
+## Core workflow
 
 1. User browses RSS feeds on smartphone and finds interesting links
 2. User submits link URL via mobile-optimized web interface
@@ -16,7 +16,7 @@ LogKeep is a self-hosted multi-user web service that allows users to curate cont
 
 ## Architecture
 
-### Technology Stack
+### Technology stack
 
 - **Backend**: FastAPI (Python 3.12)
 - **Database**: SQLite with SQLAlchemy ORM
@@ -29,7 +29,7 @@ LogKeep is a self-hosted multi-user web service that allows users to curate cont
 - **Admin Interface**: Click CLI framework
 - **Deployment**: Docker with docker-compose
 
-### Project Structure
+### Project structure
 
 ```
 logkeep/
@@ -84,9 +84,9 @@ logkeep/
 └── PLAN.md                  # This file
 ```
 
-## Data Models
+## Data models
 
-### User Model
+### User model
 ```python
 - id: Integer (primary key)
 - username: String (unique, indexed)
@@ -99,7 +99,7 @@ logkeep/
 - created_at: DateTime
 ```
 
-### Link Model
+### Link model
 ```python
 - id: Integer (primary key)
 - user_id: Integer (foreign key to User)
@@ -113,7 +113,7 @@ logkeep/
 - processed_at: DateTime (nullable)
 ```
 
-### Invite Model
+### Invite model
 ```python
 - id: Integer (primary key)
 - code: String (UUID, unique)
@@ -123,7 +123,7 @@ logkeep/
 - used_at: DateTime (nullable)
 ```
 
-## Key Features
+## Key features
 
 ### 1. Authentication & Authorization
 - **Invite-only registration**: Users need valid invite code to register
@@ -131,7 +131,7 @@ logkeep/
 - **Password security**: Bcrypt hashing with appropriate work factor
 - **Token encryption**: GitHub PATs encrypted at rest using Fernet
 
-### 2. Link Submission & Processing
+### 2. Link submission & processing
 - **Duplicate detection**: Check user's existing links before queuing
 - **Async processing**: BackgroundTasks for non-blocking operations
 - **Title extraction**: Automatic via trafilatura/beautifulsoup4
@@ -139,13 +139,13 @@ logkeep/
 - **Retry logic**: Up to 3 automatic retries on transient failures
 - **Status tracking**: Real-time status updates visible in dashboard
 
-### 3. Tag Management
+### 3. Tag management
 - **Per-user collections**: Each user maintains personal tag set
 - **Autocomplete**: HTML5 datalist for mobile-friendly tag selection
 - **Tag limits**: Max 100 tags per user to prevent bloat
 - **CRUD operations**: Add/remove tags via dedicated interface
 
-### 4. GitHub Integration
+### 4. GitHub integration
 - **Repository operations**: Clone, append, commit, push workflow
 - **Journal file management**: Auto-create `journals/YYYY_MM_DD.md`
 - **Format compliance**: `- [[Title]] [link](url) #links #tag1 #tag2`
@@ -153,7 +153,7 @@ logkeep/
 - **Conflict resolution**: Last-push-wins (one user per repo)
 - **Error handling**: Comprehensive logging of auth, network, conflict errors
 
-### 5. Mobile-Optimized UI
+### 5. Mobile-optimized UI
 - **Responsive design**: Mobile-first CSS with large tap targets (44px+)
 - **Minimal typing**: Autocomplete, pre-filled fields, checkboxes
 - **Dashboard**: Recent 50 submissions with color-coded status
@@ -167,14 +167,14 @@ logkeep/
 - **Debugging tools**: View failed links, retry processing, test GitHub
 - **Key generation**: Helper for Fernet encryption keys
 
-### 7. Operational Features
+### 7. Operational features
 - **Health checks**: `/health` endpoint for monitoring
 - **Startup recovery**: Reset stale processing tasks on boot
 - **Structured logging**: Console + rotating file logs
 - **Docker deployment**: Compose with volume persistence
 - **Environment config**: `.env` for secrets and configuration
 
-## Logseq Entry Format
+## Logseq entry format
 
 All entries follow this standardized single-line format:
 
@@ -193,7 +193,7 @@ All entries follow this standardized single-line format:
 
 **File creation**: If journal file doesn't exist, create as blank file (no headers)
 
-## Environment Variables
+## Environment variables
 
 ### Required
 - `SESSION_SECRET`: Random string for JWT signing (min 32 chars)
@@ -205,7 +205,7 @@ All entries follow this standardized single-line format:
 - `LOG_LEVEL`: Logging verbosity (default: INFO)
 - `MAX_RETRY_COUNT`: Link processing retries (default: 3)
 
-### Generation Commands
+### Generation commands
 ```bash
 # Generate Fernet encryption key
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -214,7 +214,7 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-## API Endpoints
+## API endpoints
 
 ### Authentication
 - `POST /api/auth/register` - Register with invite code
@@ -236,14 +236,14 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 ### Health
 - `GET /health` - Health check (database connectivity)
 
-## CLI Commands
+## CLI commands
 
 ### Database
 ```bash
 python -m src.cli.admin init-db              # Initialize database tables
 ```
 
-### User Management
+### User management
 ```bash
 python -m src.cli.admin create-user \
   --username alice \
@@ -257,13 +257,13 @@ python -m src.cli.admin deactivate-user alice
 python -m src.cli.admin activate-user alice
 ```
 
-### Invite Management
+### Invite management
 ```bash
 python -m src.cli.admin create-invite --count 5  # Generate 5 invite codes
 python -m src.cli.admin list-invites --unused    # Show unused invites
 ```
 
-### Debugging & Maintenance
+### Debugging & maintenance
 ```bash
 python -m src.cli.admin view-failed-links --username alice --limit 10
 python -m src.cli.admin retry-failed --username alice
@@ -271,9 +271,9 @@ python -m src.cli.admin test-github alice    # Validate GitHub access
 python -m src.cli.admin generate-key         # Generate Fernet key
 ```
 
-## Deployment Guide
+## Deployment guide
 
-### Local Development
+### Local development
 ```bash
 # 1. Clone repository
 git clone https://github.com/gperdrizet/logkeep.git
@@ -307,7 +307,7 @@ python -m src.cli.admin create-invite --count 3
 uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Docker Deployment
+### Docker deployment
 ```bash
 # 1. Create .env file
 cp .env.example .env
@@ -326,7 +326,7 @@ docker-compose exec app python -m src.cli.admin create-user ...
 docker-compose logs -f app
 ```
 
-### VPS Production Deployment
+### VPS production deployment
 
 **Prerequisites**: VPS with Docker, domain name, ports 80/443 open
 
@@ -393,7 +393,7 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
-## GitHub Personal Access Token Setup
+## GitHub Personal Access Token setup
 
 Users need a GitHub PAT with `repo` scope:
 
@@ -408,7 +408,7 @@ Users need a GitHub PAT with `repo` scope:
 
 **Note**: Token must have access to the target Logseq repository (private or public).
 
-## User Workflow
+## User workflow
 
 ### 1. Registration
 - Obtain invite code from admin
@@ -417,7 +417,7 @@ Users need a GitHub PAT with `repo` scope:
 - Enter GitHub PAT and repository details (owner/name)
 - System encrypts token and creates account
 
-### 2. Submit Links
+### 2. Submit links
 - Browse RSS feeds, find interesting article
 - Visit LogKeep `/submit` page
 - Paste URL (autofocus, minimal typing)
@@ -425,18 +425,18 @@ Users need a GitHub PAT with `repo` scope:
 - Select tags from autocomplete list
 - Submit → Returns to dashboard
 
-### 3. Handle Title Extraction Failures
+### 3. Handle title extraction failures
 - Dashboard shows "needs_title" status
 - Click "Provide Title" button
 - Enter title manually
 - Resubmit → Processing continues
 
-### 4. Monitor Status
+### 4. Monitor status
 - Dashboard shows recent 50 submissions
 - Color-coded status: pending (blue), processing (yellow), completed (green), failed (red)
 - Click for error details on failures
 
-### 5. Manage Tags
+### 5. Manage tags
 - Visit `/tags` page
 - View current tag collection
 - Add new tags (up to 100 total)
@@ -449,60 +449,60 @@ Users need a GitHub PAT with `repo` scope:
 - Click `[[Title]]` to create/view page reference
 - Click `[link](url)` to open original article
 
-## Error Handling & Retry Logic
+## Error handling & retry logic
 
-### Processing States
+### Processing states
 - **pending**: Queued for processing
 - **processing**: Currently being processed
 - **needs_title**: Title extraction failed, awaiting user input
 - **completed**: Successfully committed to GitHub
 - **failed**: Exceeded retry limit or permanent error
 
-### Retry Logic
+### Retry logic
 - Transient failures (network, GitHub API rate limit): Auto-retry up to 3 times
 - Permanent failures (auth error, repo not found): Fail immediately, no retry
 - Stale processing tasks: Reset to pending on app startup (if retry_count < 3)
 - Failed links: Admin can manually retry via CLI
 
-### Error Logging
+### Error logging
 - All errors logged to `logs/app.log` with full traceback
 - Link model stores last error message for user visibility
 - GitHub operation errors include API response details
 - Authentication errors (invalid token) marked as permanent failure
 
-## Security Considerations
+## Security considerations
 
-### Token Encryption
+### Token encryption
 - GitHub PATs encrypted at rest using Fernet (AES-128-CBC)
 - Encryption key stored in environment variable (never in code/database)
 - Decryption only happens in-memory during GitHub operations
 - Tokens never exposed in API responses or logs
 
-### Password Security
+### Password security
 - Bcrypt hashing with appropriate work factor (default: 12 rounds)
 - Passwords never stored in plaintext
 - Session cookies HTTP-only, secure flag in production
 - JWT tokens signed with secret key
 
-### Database Security
+### Database security
 - SQLite file permissions: 600 (owner read/write only)
 - No SQL injection: SQLAlchemy ORM parameterization
 - Unique constraints prevent duplicate invites/users
 - Soft deletes via is_active flag (preserve audit trail)
 
-### Input Validation
+### Input validation
 - URL validation before processing
 - Title length limits (prevent database bloat)
 - Tag count limits per user
 - Username/password complexity requirements
 
-### Network Security
+### Network security
 - HTTPS required in production (via reverse proxy)
 - CORS disabled (same-origin only)
 - Rate limiting recommended (via nginx)
 - Health check endpoint requires no auth (for monitoring)
 
-## Performance Considerations
+## Performance considerations
 
 ### Database
 - SQLite sufficient for <1000 users
@@ -510,27 +510,27 @@ Users need a GitHub PAT with `repo` scope:
 - Composite unique index on (user_id, url) for duplicate detection
 - Connection pooling via SQLAlchemy
 
-### Background Processing
+### Background processing
 - FastAPI BackgroundTasks for simple async (no external dependencies)
 - Tasks don't block HTTP responses
 - Startup recovery prevents lost jobs
 - Consider Redis + Celery if scaling beyond single server
 
-### Content Extraction
+### Content extraction
 - Trafilatura timeout: 10 seconds
 - Beautifulsoup4 fallback for failures
 - No caching (content changes over time)
 - Retries on network timeouts
 
-### GitHub Operations
+### GitHub operations
 - Pull before append to reduce conflicts
 - Batch operations if multiple links in queue (future optimization)
 - PyGithub caching of API responses
 - Token reuse across requests (single session)
 
-## Monitoring & Maintenance
+## Monitoring & maintenance
 
-### Health Checks
+### Health checks
 - `/health` endpoint checks database connectivity
 - Docker healthcheck every 30 seconds
 - Returns JSON: `{"status": "healthy", "database": "connected"}`
@@ -557,7 +557,7 @@ Users need a GitHub PAT with `repo` scope:
 - GitHub API rate limits (5000/hour authenticated)
 - Alert on repeated processing failures
 
-## Future Enhancements
+## Future enhancements
 
 ### Phase 2 (Post-MVP)
 - [ ] AI-powered summarization (OpenAI/Anthropic integration)
@@ -575,27 +575,27 @@ Users need a GitHub PAT with `repo` scope:
 - [ ] Mobile native app (React Native/Flutter)
 - [ ] Self-service user registration (waitlist)
 
-## Testing Strategy
+## Testing strategy
 
-### Unit Tests
+### Unit tests
 - Models: CRUD operations, validation, constraints
 - Encryption: Encrypt/decrypt roundtrip
 - Authentication: Password hashing, JWT validation
 - GitHub service: Mock PyGithub responses
 
-### Integration Tests
+### Integration tests
 - API endpoints: Full request/response cycle
 - Background tasks: Processing workflow end-to-end
 - Database: Transactions, rollbacks, concurrency
 - CLI commands: User creation, invite generation
 
-### Manual Testing
+### Manual testing
 - Mobile UI: Test on actual smartphone devices
 - Browser compatibility: Safari iOS, Chrome Android
 - Network failures: Simulate GitHub API errors
 - Edge cases: Empty tags, very long titles, malformed URLs
 
-## Known Limitations
+## Known limitations
 
 1. **Single server**: FastAPI BackgroundTasks not distributed (use Celery for multi-server)
 2. **One user per repository**: No conflict resolution for concurrent edits
@@ -606,9 +606,9 @@ Users need a GitHub PAT with `repo` scope:
 7. **No email notifications**: No alerts for failed processing (add SMTP integration)
 8. **Invite-only**: No public registration or waitlist (feature flag for future)
 
-## Success Metrics
+## Success metrics
 
-### MVP Launch Criteria
+### MVP launch criteria
 - [ ] User can register with invite code
 - [ ] User can submit link and see it in Logseq within 1 minute
 - [ ] Title extraction works for 90%+ of common sites
@@ -617,7 +617,7 @@ Users need a GitHub PAT with `repo` scope:
 - [ ] Admin can manage users via CLI
 - [ ] Deployment documented and tested on VPS
 
-### Post-Launch Metrics
+### Post-launch metrics
 - Average time from submission to Logseq commit
 - Title extraction success rate
 - Processing failure rate and common errors
@@ -633,7 +633,7 @@ MIT License - See LICENSE file for details.
 
 **Project Status**: Planning Complete → Ready for Implementation
 
-**Next Steps**:
+**Next steps**:
 1. Create project structure
 2. Implement database models
 3. Build authentication layer

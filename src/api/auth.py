@@ -107,7 +107,7 @@ async def register(
     
     # Mark invite as used
     invite.used_by_user_id = user.id
-    invite.used_at = datetime.utcnow()
+    invite.used_at = datetime.now()
     
     db.commit()
     db.refresh(user)
