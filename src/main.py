@@ -359,6 +359,7 @@ async def submit_link(
 @app.post("/links/{link_id}/title")
 async def update_link_title(
     link_id: int,
+    background_tasks: BackgroundTasks,
     title: str = Form(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -382,8 +383,8 @@ async def update_link_title(
     
     logger.info(f"Title updated for link {link_id}: {title}")
     
-    # Queue for processing
-    # process_link(link.id, db)
+    # Queue for processing in background
+    background_tasks.add_task(process_link, link.id)
     
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
 

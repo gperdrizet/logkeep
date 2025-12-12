@@ -49,6 +49,37 @@ header h1 {
     margin-bottom: 8px;
 }
 
+header h1 .repo-info {
+    font-size: 16px;
+    font-weight: normal;
+    opacity: 0.9;
+    font-family: inherit;
+    letter-spacing: normal;
+}
+
+header h1 .logout-link {
+    font-size: 14px;
+    font-weight: normal;
+    opacity: 0.9;
+    background: none;
+    background-color: transparent;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    text-decoration: none;
+    font-family: inherit;
+    letter-spacing: normal;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+header h1 .logout-link:hover {
+    opacity: 1;
+}
+
 header .user-info {
     font-size: 14px;
     opacity: 0.9;
@@ -70,6 +101,8 @@ nav a, nav button {
     background-color: rgba(255, 255, 255, 0.2);
     border: none;
     font-size: 14px;
+    font-family: inherit;
+    font-weight: normal;
     cursor: pointer;
 }
 

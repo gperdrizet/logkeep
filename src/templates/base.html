@@ -13,17 +13,17 @@
     {% if user %}
     <header>
         <div class="container">
-            <h1>📚 LogKeep</h1>
-            <div class="user-info">
-                {{ user.username }} → {{ user.repo_owner }}/{{ user.repo_name }}
-            </div>
+            <h1>
+                LogKeep 
+                <span class="repo-info">{{ user.repo_owner }}/{{ user.repo_name }}</span>
+                <form action="/logout" method="post" style="display: inline;">
+                    <button type="submit" class="logout-link">[logout]</button>
+                </form>
+            </h1>
             <nav>
                 <a href="/dashboard">Dashboard</a>
                 <a href="/submit">Submit Link</a>
                 <a href="/tags">Tags</a>
-                <form action="/logout" method="post" style="display: inline;">
-                    <button type="submit">Logout</button>
-                </form>
             </nav>
         </div>
     </header>
