@@ -18,37 +18,42 @@
 {% endif %}
 
 <div class="card">
-    <form action="/submit" method="post">
+    <form action="/submit" method="post" id="submit-form">
         <div class="form-group">
             <label for="url">Link</label>
             <input type="url" id="url" name="url" placeholder="https://example.com/article" required autofocus>
         </div>
         
         <div class="form-group">
-            <label for="title">Title</label>
+            <label for="title">Title <span style="font-weight: normal; color: #6b7280;">(optional)</span></label>
             <input type="text" id="title" name="title" placeholder="Leave blank for automatic extraction" maxlength="500">
         </div>
         
         <div class="form-group">
             <label for="tags">Tags</label>
-            <input type="text" id="tags" name="tags" placeholder="Start typing to search tags..." list="tag-list">
-            <datalist id="tag-list">
-                {% for tag in user_tags %}
-                <option value="{{ tag }}">
-                {% endfor %}
-            </datalist>
+            <div style="position: relative;">
+                <input type="text" id="tags" name="tags" placeholder="Start typing to add tags..." autocomplete="off">
+                <div id="tag-suggestions" style="display: none; position: absolute; z-index: 1000; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 2px;"></div>
+            </div>
         </div>
         
+        {% if user_tags %}
         <div id="selected-tags" class="link-tags" style="margin-bottom: 16px;"></div>
+        {% endif %}
         
         <input type="hidden" id="tags-hidden" name="tags_json" value="[]">
         
         <div class="form-group">
-            <label for="score">Score</label>
+            <label for="score">Score <span style="font-weight: normal; color: #6b7280;">(optional)</span></label>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="font-size: 14px; color: #6b7280;">0.0</span>
+                <span id="score-value" style="font-size: 16px; font-weight: 600; color: var(--primary-color);">0.5</span>
+                <span style="font-size: 14px; color: #6b7280;">1.0</span>
+            </div>
             <input type="range" id="score" name="score" min="0" max="1" step="0.1" value="0.5" class="score-slider">
         </div>
         
-        <button type="submit" class="btn btn-primary">Submit</button>
+        <button type="submit" class="btn btn-primary">Submit Link</button>
     </form>
 </div>
 
@@ -56,34 +61,124 @@
 
 {% block extra_scripts %}
 <script>
-// Tag selection with datalist
-const tagsInput = document.getElementById('tags');
-const selectedTagsDiv = document.getElementById('selected-tags');
-const tagsHidden = document.getElementById('tags-hidden');
-let selectedTags = [];
-
-tagsInput.addEventListener('change', function() {
-    const tag = this.value.trim();
-    if (tag && !selectedTags.includes(tag)) {
-        selectedTags.push(tag);
+    // Tag selection functionality (mobile-friendly autocomplete)
+    const tagsInput = document.getElementById('tags');
+    const selectedTagsDiv = document.getElementById('selected-tags');
+    const tagsHidden = document.getElementById('tags-hidden');
+    const suggestionsDiv = document.getElementById('tag-suggestions');
+    const userTags = {{ user_tags | tojson }};
+    let selectedTags = [];
+    let filteredTags = [];
+    
+    // Show suggestions as user types
+    tagsInput.addEventListener('input', function() {
+        const query = this.value.trim().toLowerCase();
+        
+        if (query.length === 0) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+        
+        // Filter tags that match the query and aren't already selected
+        filteredTags = userTags.filter(tag => 
+            tag.toLowerCase().includes(query) && !selectedTags.includes(tag)
+        );
+        
+        if (filteredTags.length === 0) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+        
+        // Display suggestions
+        suggestionsDiv.innerHTML = filteredTags.map(tag => 
+            `<div class="tag-suggestion" data-tag="${tag}" style="padding: 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0;">${tag}</div>`
+        ).join('');
+        suggestionsDiv.style.display = 'block';
+    });
+    
+    // Handle clicking on a suggestion
+    suggestionsDiv.addEventListener('click', function(e) {
+        const suggestionDiv = e.target.closest('.tag-suggestion');
+        if (suggestionDiv) {
+            const tag = suggestionDiv.getAttribute('data-tag');
+            addTag(tag);
+        }
+    });
+    
+    // Handle Enter key
+    tagsInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const query = this.value.trim().toLowerCase();
+            
+            // If there's an exact match or single filtered result, use it
+            if (filteredTags.length === 1) {
+                addTag(filteredTags[0]);
+            } else if (userTags.includes(query) && !selectedTags.includes(query)) {
+                addTag(query);
+            } else if (query) {
+                alert(`Tag "${query}" doesn't exist in your collection. Add it in the Tags page first.`);
+            }
+        }
+    });
+    
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!tagsInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+    
+    // Add tag helper function
+    function addTag(tag) {
+        if (!selectedTags.includes(tag)) {
+            selectedTags.push(tag);
+            updateSelectedTags();
+        }
+        tagsInput.value = '';
+        suggestionsDiv.style.display = 'none';
+        filteredTags = [];
+    }
+    
+    function updateSelectedTags() {
+        if (selectedTags.length === 0) {
+            selectedTagsDiv.innerHTML = '';
+        } else {
+            selectedTagsDiv.innerHTML = selectedTags.map(tag => 
+                `<span class="tag">
+                    ${tag}
+                    <button type="button" onclick="removeTag('${tag}')" style="background: none; border: none; color: inherit; cursor: pointer; margin-left: 4px; font-size: 18px; line-height: 1;">×</button>
+                </span>`
+            ).join('');
+        }
+        tagsHidden.value = JSON.stringify(selectedTags);
+    }
+    
+    function removeTag(tag) {
+        selectedTags = selectedTags.filter(t => t !== tag);
         updateSelectedTags();
     }
-    this.value = '';
-});
-
-function updateSelectedTags() {
-    selectedTagsDiv.innerHTML = selectedTags.map(tag => 
-        `<span class="tag">
-            #${tag}
-            <button type="button" onclick="removeTag('${tag}')" style="background: none; border: none; color: inherit; cursor: pointer; margin-left: 4px;">×</button>
-        </span>`
-    ).join('');
-    tagsHidden.value = JSON.stringify(selectedTags);
-}
-
-function removeTag(tag) {
-    selectedTags = selectedTags.filter(t => t !== tag);
-    updateSelectedTags();
-}
+    
+    // Score slider display
+    const scoreSlider = document.getElementById('score');
+    const scoreValue = document.getElementById('score-value');
+    
+    scoreSlider.addEventListener('input', function() {
+        scoreValue.textContent = parseFloat(this.value).toFixed(1);
+    });
+    
+    // Form validation
+    document.getElementById('submit-form').addEventListener('submit', function(e) {
+        const url = document.getElementById('url').value.trim();
+        
+        if (!url) {
+            e.preventDefault();
+            alert('Please enter a URL');
+            return false;
+        }
+        
+        // URL is valid, form can submit
+        return true;
+    });
 </script>
 {% endblock %}

@@ -8,12 +8,10 @@
 <div class="card" style="margin-bottom: 20px;">
     <form action="/dashboard" method="get" id="filter-form">
         <div class="form-group" style="margin-bottom: 0;">
-            <input type="text" id="filter_tag_input" placeholder="Add tag to filter..." list="tag-list">
-            <datalist id="tag-list">
-                {% for tag in user.tags %}
-                <option value="{{ tag }}">
-                {% endfor %}
-            </datalist>
+            <div style="position: relative;">
+                <input type="text" id="filter_tag_input" placeholder="Add tag to filter..." autocomplete="off">
+                <div id="tag-suggestions" style="display: none; position: absolute; z-index: 1000; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 2px;"></div>
+            </div>
         </div>
         <input type="hidden" id="filter_tags" name="filter_tags" value="{{ ','.join(filter_tag_list) if filter_tag_list else '' }}">
     </form>
@@ -23,7 +21,7 @@
         {% for tag in filter_tag_list %}
         <span class="tag">
             {{ tag }}
-            <button type="button" onclick="removeFilterTag('{{ tag }}')" style="background: none; border: none; color: inherit; cursor: pointer; margin-left: 4px;">×</button>
+            <button type="button" onclick="removeFilterTag('{{ tag }}')" style="background: none; border: none; color: inherit; cursor: pointer; margin-left: 4px; font-size: 18px; line-height: 1;">×</button>
         </span>
         {% endfor %}
     </div>
@@ -65,10 +63,10 @@
         {% if link.selected_tags %}
         <div class="link-tags">
             {% for tag in link.selected_tags %}
-            <span class="tag">#{{ tag }}</span>
+            <span class="tag">{{ tag }}</span>
             {% endfor %}
             {% if link.score is not none %}
-            <span class="tag" style="background-color: #6b7280;">{{ "%.1f"|format(link.score) }}</span>
+            <span class="tag" style="background-color: #d1d5db; color: #374151;">{{ "%.1f"|format(link.score) }}</span>
             {% endif %}
         </div>
         {% endif %}
@@ -104,21 +102,83 @@
 
 {% block extra_scripts %}
 <script>
-    // Multi-tag filter functionality
+    // Multi-tag filter functionality (mobile-friendly autocomplete)
     const filterInput = document.getElementById('filter_tag_input');
     const filterTagsHidden = document.getElementById('filter_tags');
     const filterForm = document.getElementById('filter-form');
-    let filterTags = filterTagsHidden.value ? filterTagsHidden.value.split(',') : [];
+    const suggestionsDiv = document.getElementById('tag-suggestions');
+    const userTags = {{ user.tags | tojson }};
+    let filterTags = filterTagsHidden.value ? filterTagsHidden.value.split(',').filter(t => t) : [];
+    let filteredTags = [];
     
+    // Show suggestions as user types
     if (filterInput) {
-        filterInput.addEventListener('change', function() {
-            const tag = this.value.trim();
-            if (tag && !filterTags.includes(tag)) {
-                filterTags.push(tag);
-                updateFilterTags();
+        filterInput.addEventListener('input', function() {
+            const query = this.value.trim().toLowerCase();
+            
+            if (query.length === 0) {
+                suggestionsDiv.style.display = 'none';
+                return;
             }
-            this.value = '';
+            
+            // Filter tags that match the query and aren't already selected
+            filteredTags = userTags.filter(tag => 
+                tag.toLowerCase().includes(query) && !filterTags.includes(tag)
+            );
+            
+            if (filteredTags.length === 0) {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            // Display suggestions
+            suggestionsDiv.innerHTML = filteredTags.map(tag => 
+                `<div class="tag-suggestion" data-tag="${tag}" style="padding: 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0;">#${tag}</div>`
+            ).join('');
+            suggestionsDiv.style.display = 'block';
         });
+        
+        // Handle clicking on a suggestion
+        suggestionsDiv.addEventListener('click', function(e) {
+            const suggestionDiv = e.target.closest('.tag-suggestion');
+            if (suggestionDiv) {
+                const tag = suggestionDiv.getAttribute('data-tag');
+                addFilterTag(tag);
+            }
+        });
+        
+        // Handle Enter key
+        filterInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const query = this.value.trim().toLowerCase();
+                
+                // If there's an exact match or single filtered result, use it
+                if (filteredTags.length === 1) {
+                    addFilterTag(filteredTags[0]);
+                } else if (userTags.includes(query) && !filterTags.includes(query)) {
+                    addFilterTag(query);
+                }
+            }
+        });
+        
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!filterInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+                suggestionsDiv.style.display = 'none';
+            }
+        });
+    }
+    
+    // Add filter tag helper function
+    function addFilterTag(tag) {
+        if (!filterTags.includes(tag)) {
+            filterTags.push(tag);
+            updateFilterTags();
+        }
+        filterInput.value = '';
+        suggestionsDiv.style.display = 'none';
+        filteredTags = [];
     }
     
     function updateFilterTags() {
