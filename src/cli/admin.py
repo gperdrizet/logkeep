@@ -342,5 +342,39 @@ def generate_key():
     click.echo("\nAdd this to your .env file as ENCRYPTION_KEY")
 
 
+@cli.command('import-tags')
+@click.argument('username')
+def import_tags(username):
+    """Import tags from user's existing journal files."""
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            click.echo(f"✗ User '{username}' not found", err=True)
+            sys.exit(1)
+        
+        click.echo(f"Importing tags from {user.repo_owner}/{user.repo_name}...")
+        
+        from src.services.github import import_tags_from_journals
+        count, error = import_tags_from_journals(user, db)
+        
+        if error:
+            click.echo(f"⚠ Warning: {error}")
+        
+        if count > 0:
+            click.echo(f"✓ Imported {count} tag(s)")
+            click.echo("\nImported tags:")
+            for tag in sorted(user.tags):
+                click.echo(f"  #{tag}")
+        else:
+            click.echo("No new tags imported")
+        
+    except Exception as e:
+        click.echo(f"✗ Error importing tags: {str(e)}", err=True)
+        sys.exit(1)
+    finally:
+        db.close()
+
+
 if __name__ == '__main__':
     cli()

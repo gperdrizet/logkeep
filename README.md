@@ -167,6 +167,13 @@ python -m src.cli.admin list-invites
 python -m src.cli.admin list-invites --unused
 ```
 
+### Tag management
+
+```bash
+# Import tags from user's existing journal files
+python -m src.cli.admin import-tags USERNAME
+```
+
 ### Debugging
 
 ```bash

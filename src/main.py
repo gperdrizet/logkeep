@@ -230,6 +230,16 @@ async def register_submit(
         
         logger.info(f"New user registered: {username}")
         
+        # Import tags from existing journals in background
+        try:
+            from src.services.github import import_tags_from_journals
+            tag_count, tag_error = import_tags_from_journals(user, db)
+            if tag_count > 0:
+                logger.info(f"Auto-imported {tag_count} tags for new user {username}")
+        except Exception as e:
+            # Don't fail registration if tag import fails
+            logger.warning(f"Failed to auto-import tags for {username}: {str(e)}")
+        
         # Redirect to login
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
         

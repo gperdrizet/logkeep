@@ -152,3 +152,102 @@ def test_github_connection(user: User) -> Tuple[bool, str]:
             return False, f"GitHub error: {e.data.get('message', str(e)) if hasattr(e, 'data') else str(e)}"
     except Exception as e:
         return False, f"Error: {str(e)}"
+
+
+def import_tags_from_journals(user: User, db: Session) -> Tuple[int, Optional[str]]:
+    """
+    Import tags from user's existing journal files in GitHub repository.
+    
+    Reads all markdown files in journals/ directory and extracts hashtags.
+    Filters out common system tags and adds unique tags to user's collection.
+    
+    Args:
+        user: User object
+        db: Database session
+        
+    Returns:
+        Tuple of (tags_imported_count: int, error_message: Optional[str])
+    """
+    import re
+    
+    try:
+        # Decrypt GitHub token
+        github_token = decrypt_token(user.encrypted_github_token)
+        
+        # Initialize GitHub client
+        g = Github(github_token)
+        repo = g.get_repo(f"{user.repo_owner}/{user.repo_name}")
+        
+        logger.info(f"Importing tags from {user.repo_owner}/{user.repo_name} for user {user.username}")
+        
+        # Try to get journals directory
+        try:
+            contents = repo.get_contents("journals")
+        except GithubException as e:
+            if e.status == 404:
+                logger.info(f"No journals/ directory found for user {user.username}")
+                return 0, None
+            raise
+        
+        # Collect all tags from journal files
+        all_tags = set()
+        file_count = 0
+        
+        # Filter for markdown files
+        journal_files = [f for f in contents if f.name.endswith('.md')]
+        
+        for file in journal_files:
+            try:
+                content = file.decoded_content.decode('utf-8')
+                # Extract hashtags using regex
+                # Matches #word, #word-with-dashes, #word_with_underscores
+                tags = re.findall(r'#([\w-]+)', content)
+                all_tags.update(tag.lower() for tag in tags)
+                file_count += 1
+            except Exception as e:
+                logger.warning(f"Error reading journal file {file.name}: {str(e)}")
+                continue
+        
+        # Filter out system tags and tags that don't match our validation
+        excluded_tags = {'links', 'link', 'todo', 'done', 'later', 'now', 'doing', 'waiting'}
+        valid_tags = {
+            tag for tag in all_tags
+            if tag not in excluded_tags
+            and len(tag) <= 50
+            and re.match(r'^[a-zA-Z0-9_-]+$', tag)
+        }
+        
+        # Add new tags to user's collection
+        new_tags = [tag for tag in valid_tags if tag not in user.tags]
+        
+        if new_tags:
+            max_tags = int(os.getenv("MAX_TAGS_PER_USER", "100"))
+            available_slots = max_tags - len(user.tags)
+            
+            if available_slots > 0:
+                tags_to_add = sorted(new_tags)[:available_slots]
+                user.tags.extend(tags_to_add)
+                
+                # Mark as modified for SQLAlchemy
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(user, "tags")
+                db.commit()
+                
+                logger.info(f"Imported {len(tags_to_add)} tags from {file_count} journal files for user {user.username}")
+                return len(tags_to_add), None
+            else:
+                logger.warning(f"User {user.username} already has maximum tags ({max_tags})")
+                return 0, f"Tag collection already at maximum ({max_tags})"
+        else:
+            logger.info(f"No new tags found in journals for user {user.username}")
+            return 0, None
+        
+    except GithubException as e:
+        error_msg = f"GitHub error: {e.data.get('message', str(e)) if hasattr(e, 'data') else str(e)}"
+        logger.error(f"Failed to import tags for user {user.username}: {error_msg}")
+        return 0, error_msg
+        
+    except Exception as e:
+        error_msg = f"Unexpected error: {str(e)}"
+        logger.error(f"Failed to import tags for user {user.username}: {error_msg}", exc_info=True)
+        return 0, error_msg
