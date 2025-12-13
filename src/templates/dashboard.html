@@ -67,7 +67,7 @@
                 <span class="tag">{{ tag }}</span>
                 {% endfor %}
                 {% if link.score is not none %}
-                <span class="tag" style="background-color: #d1d5db; color: #374151;">{{ "%.1f"|format(link.score) }}</span>
+                <span class="tag" style="background-color: #d1d5db; color: #374151;">{{ "%.2f"|format(link.score) }}</span>
                 {% endif %}
             </div>
             {% if link.status.value == 'completed' %}
@@ -123,7 +123,7 @@
             
             <div class="form-group">
                 <label for="edit-score">Score</label>
-                <input type="range" id="edit-score" name="score" min="0" max="1" step="0.1" value="0.5" class="score-slider">
+                <input type="range" id="edit-score" name="score" min="0" max="1" step="0.01" value="0.5" class="score-slider">
             </div>
             
             <div class="form-group">
