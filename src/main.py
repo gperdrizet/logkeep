@@ -305,6 +305,7 @@ async def submit_link(
     url: str = Form(...),
     title: Optional[str] = Form(None),
     tags_json: str = Form("[]"),
+    score: Optional[float] = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -350,6 +351,7 @@ async def submit_link(
         url=url,
         title=title if title else None,
         selected_tags=selected_tags,
+        score=score,
         status=LinkStatus.PENDING,
         retry_count=0
     )

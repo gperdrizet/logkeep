@@ -42,6 +42,9 @@
             {% for tag in link.selected_tags %}
             <span class="tag">#{{ tag }}</span>
             {% endfor %}
+            {% if link.score %}
+            <span class="tag" style="background-color: #6b7280;">{{ link.score }}</span>
+            {% endif %}
         </div>
         {% endif %}
         

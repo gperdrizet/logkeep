@@ -59,9 +59,10 @@ def commit_link_to_github(link: Link, db: Session) -> Tuple[bool, Optional[str]]
         logger.info(f"Committing link {link.id} to {user.repo_owner}/{user.repo_name}:{journal_path}")
         
         # Format the entry
-        # Format: - [[Title]] [link](url) #links #tag1 #tag2
+        # Format: - [[Title]] [link](url) #links #tag1 #tag2 score
         tags_str = " ".join([f"#{tag}" for tag in link.selected_tags])
-        entry = f"- [[{link.title}]] [link]({link.url}) #links {tags_str}\n"
+        score_str = f" {link.score}" if link.score is not None else ""
+        entry = f"- [[{link.title}]] [link]({link.url}) #links {tags_str}{score_str}\n"
         
         # Try to get existing file
         try:

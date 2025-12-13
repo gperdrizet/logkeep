@@ -1,6 +1,6 @@
 """Link submission model."""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, UniqueConstraint, Index
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, UniqueConstraint, Index, Float
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Enum as SQLEnum
 from src.models import Base, LinkStatus
@@ -15,6 +15,7 @@ class Link(Base):
     url = Column(Text, nullable=False)
     title = Column(String(500), nullable=True)  # Nullable until extracted/provided
     selected_tags = Column(JSON, nullable=False, default=list)  # Array of selected tag strings
+    score = Column(Float, nullable=True)  # User rating 1-9
     status = Column(SQLEnum(LinkStatus), nullable=False, default=LinkStatus.PENDING)
     retry_count = Column(Integer, nullable=False, default=0)
     error_message = Column(Text, nullable=True)
