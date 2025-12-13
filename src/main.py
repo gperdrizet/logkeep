@@ -271,15 +271,18 @@ async def dashboard(
     """User dashboard showing recent submissions."""
     # Get user links using service
     link_service = LinkService(db)
-    all_links = link_service.get_user_links(current_user.id, limit=50)
     
-    # Apply tag filter if specified
+    # Parse tag filter
     filter_tag_list = []
     if filter_tags:
         filter_tag_list = [tag.strip() for tag in filter_tags.split(',') if tag.strip()]
-        links = [link for link in all_links if all(tag in link.selected_tags for tag in filter_tag_list)]
-    else:
-        links = all_links
+    
+    # Get links with optional tag filtering at database level
+    links = link_service.get_user_links(
+        current_user.id, 
+        limit=50, 
+        tag_names=filter_tag_list if filter_tag_list else None
+    )
     
     # Calculate analytics using service
     analytics = AnalyticsService()
@@ -344,7 +347,7 @@ async def submit_page(
         {
             "request": request,
             "user": current_user,
-            "user_tags": sorted(current_user.tags)
+            "user_tags": sorted([tag.name for tag in current_user.tags])
         }
     )
 
@@ -380,18 +383,23 @@ async def submit_link(
     
     # Parse tags
     try:
-        selected_tags = json.loads(tags_json)
+        tag_names = json.loads(tags_json)
     except (json.JSONDecodeError, ValueError, TypeError):
-        selected_tags = []
+        tag_names = []
     
     # Submit link using service
     try:
+        tag_service = TagService(db)
         link_service = LinkService(db)
+        
+        # Get or create tag objects
+        tag_objects = tag_service.get_or_create_tags(current_user.id, tag_names)
+        
         link = link_service.submit_link(
             user_id=current_user.id,
             url=url,
             score=score or 0.5,
-            tags=selected_tags,
+            tag_objects=tag_objects,
             manual_title=title if title else None
         )
         
@@ -408,7 +416,7 @@ async def submit_link(
             {
                 "request": request,
                 "user": current_user,
-                "user_tags": sorted(current_user.tags),
+                "user_tags": sorted([tag.name for tag in current_user.tags]),
                 "error": "This URL has already been submitted. Check your dashboard."
             },
             status_code=409
@@ -419,7 +427,7 @@ async def submit_link(
             {
                 "request": request,
                 "user": current_user,
-                "user_tags": sorted(current_user.tags),
+                "user_tags": sorted([tag.name for tag in current_user.tags]),
                 "error": str(e)
             },
             status_code=400
@@ -499,28 +507,34 @@ async def edit_link(
         
         # Parse tags
         try:
-            selected_tags = json.loads(tags_json)
+            tag_names = json.loads(tags_json)
         except (json.JSONDecodeError, ValueError, TypeError):
-            selected_tags = []
+            tag_names = []
         
         # Validate tags exist in user's collection
-        invalid_tags = [tag for tag in selected_tags if tag not in current_user.tags]
+        user_tag_names = {tag.name for tag in current_user.tags}
+        invalid_tags = [tag for tag in tag_names if tag not in user_tag_names]
         if invalid_tags:
             return RedirectResponse(
                 url=f"/dashboard?error=Invalid tags: {', '.join(invalid_tags)}",
                 status_code=status.HTTP_302_FOUND
             )
         
+        # Get Tag objects
+        tag_service = TagService(db)
+        tag_objects = [tag_service.tag_repo.get_by_name(current_user.id, name) for name in tag_names]
+        tag_objects = [t for t in tag_objects if t is not None]  # Filter out None values
+        
         # Update link using service
         link = link_service.update_link(
             link_id=link_id,
             user_id=current_user.id,
             title=title.strip(),
-            tags=selected_tags,
+            tag_objects=tag_objects,
             score=score
         )
         
-        logger.info(f"Link {link_id} edited by {current_user.username}: title='{title}', tags={selected_tags}, score={score}")
+        logger.info(f"Link {link_id} edited by {current_user.username}: title='{title}', tags={tag_names}, score={score}")
         
         # Update in GitHub
         success, error_msg = update_link_in_journal(link, db)
@@ -561,7 +575,7 @@ async def tags_page(
         {
             "request": request,
             "user": current_user,
-            "tags": sorted(current_user.tags),
+            "tags": sorted([tag.name for tag in current_user.tags]),
             "max_tags": settings.max_tags_per_user
         }
     )
@@ -579,7 +593,7 @@ async def add_tag(
     
     try:
         tag_service = TagService(db)
-        updated_tags = tag_service.add_tag(current_user.id, tag)
+        tag_obj = tag_service.add_tag(current_user.id, tag)
         
         logger.info(f"Tag added by {current_user.username}: {tag}")
         
@@ -593,7 +607,7 @@ async def add_tag(
             {
                 "request": request,
                 "user": current_user,
-                "tags": sorted(current_user.tags),
+                "tags": sorted([tag.name for tag in current_user.tags]),
                 "max_tags": settings.max_tags_per_user,
                 "error": str(e)
             },

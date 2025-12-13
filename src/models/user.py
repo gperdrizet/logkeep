@@ -1,6 +1,6 @@
 """User model."""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
 from sqlalchemy.orm import relationship
 from src.models import Base
 
@@ -15,12 +15,11 @@ class User(Base):
     encrypted_github_token = Column(Text, nullable=False)
     repo_owner = Column(String(255), nullable=False)
     repo_name = Column(String(255), nullable=False)
-    tags = Column(JSON, nullable=False, default=list)  # Array of tag strings
-    tag_counts = Column(JSON, nullable=False, default=dict)  # Dict mapping tag to count from journals
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.now, nullable=False)
 
     # Relationships
+    tags = relationship("Tag", back_populates="user", cascade="all, delete-orphan", lazy="selectin")
     links = relationship("Link", back_populates="user", cascade="all, delete-orphan")
     invites_created = relationship("Invite", foreign_keys="Invite.created_by_user_id", back_populates="creator")
     invite_used = relationship("Invite", foreign_keys="Invite.used_by_user_id", back_populates="used_by_user", uselist=False)

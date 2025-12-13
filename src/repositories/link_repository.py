@@ -148,3 +148,41 @@ class LinkRepository:
             Link.user_id == user_id,
             Link.url == url
         ).first() is not None
+    
+    def get_user_links_by_tags(
+        self,
+        user_id: int,
+        tag_names: List[str],
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Link]:
+        """
+        Get links for a user filtered by tags.
+        
+        Args:
+            user_id: User ID
+            tag_names: List of tag names (all must match)
+            limit: Maximum number of links to return
+            offset: Offset for pagination
+            
+        Returns:
+            List of links that have ALL specified tags
+        """
+        from src.models.tag import Tag, link_tags
+        
+        # Build query with joins for each tag
+        query = self.db.query(Link).filter(Link.user_id == user_id)
+        
+        for tag_name in tag_names:
+            # Join through link_tags and tags tables for each tag
+            query = query.join(
+                link_tags,
+                Link.id == link_tags.c.link_id
+            ).join(
+                Tag,
+                (link_tags.c.tag_id == Tag.id) & (Tag.name == tag_name) & (Tag.user_id == user_id)
+            )
+        
+        return query.order_by(
+            Link.submitted_at.desc()
+        ).limit(limit).offset(offset).all()

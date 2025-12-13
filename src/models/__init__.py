@@ -14,3 +14,7 @@ class LinkStatus(enum.Enum):
     NEEDS_TITLE = "needs_title"
     COMPLETED = "completed"
     FAILED = "failed"
+
+
+# Import models to ensure they're registered with Base
+from src.models.tag import Tag, link_tags  # noqa: E402, F401

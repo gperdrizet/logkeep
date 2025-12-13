@@ -62,7 +62,7 @@ def commit_link_to_github(link: Link, db: Session) -> Tuple[bool, Optional[str]]
         
         # Format the entry
         # Format: - [[Title]] [link](url) #links #tag1 #tag2 score
-        tags_str = " ".join([f"#{tag}" for tag in link.selected_tags])
+        tags_str = " ".join([f"#{tag.name}" for tag in link.tags])
         score_str = f" {link.score}" if link.score is not None else ""
         entry = f"- [[{link.title}]] [link]({link.url}) #links {tags_str}{score_str}\n"
         
@@ -214,7 +214,7 @@ def update_link_in_journal(link: Link, db: Session) -> Tuple[bool, Optional[str]
             raise
         
         # Build the new entry format
-        tags_str = " ".join([f"#{tag}" for tag in link.selected_tags])
+        tags_str = " ".join([f"#{tag.name}" for tag in link.tags])
         score_str = f" {link.score}" if link.score is not None else ""
         new_entry = f"- [[{link.title}]] [link]({link.url}) #links {tags_str}{score_str}"
         

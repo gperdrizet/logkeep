@@ -8,6 +8,7 @@ from src.models import Base
 from src.models.user import User
 from src.models.link import Link
 from src.models.invite import Invite
+from src.models.tag import Tag, link_tags
 
 load_dotenv()
 

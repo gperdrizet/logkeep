@@ -1,6 +1,6 @@
 """Link submission model."""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, UniqueConstraint, Index, Float
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, UniqueConstraint, Index, Float
 from sqlalchemy.orm import relationship
 from sqlalchemy.types import Enum as SQLEnum
 from src.models import Base, LinkStatus
@@ -14,8 +14,7 @@ class Link(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     url = Column(Text, nullable=False)
     title = Column(String(500), nullable=True)  # Nullable until extracted/provided
-    selected_tags = Column(JSON, nullable=False, default=list)  # Array of selected tag strings
-    score = Column(Float, nullable=True)  # User rating 1-9
+    score = Column(Float, nullable=True)  # User rating 0.0-1.0
     status = Column(SQLEnum(LinkStatus), nullable=False, default=LinkStatus.PENDING)
     retry_count = Column(Integer, nullable=False, default=0)
     error_message = Column(Text, nullable=True)
@@ -24,12 +23,14 @@ class Link(Base):
 
     # Relationships
     user = relationship("User", back_populates="links")
+    tags = relationship("Tag", secondary="link_tags", backref="links", lazy="selectin")
 
     # Constraints
     __table_args__ = (
         UniqueConstraint('user_id', 'url', name='uix_user_url'),  # Prevent duplicate URLs per user
         Index('ix_links_status', 'status'),  # Index for status queries
         Index('ix_links_user_id_status', 'user_id', 'status'),  # Composite index for user's link queries
+        Index('ix_links_user_id_submitted', 'user_id', 'submitted_at'),  # Optimize dashboard ordering
     )
 
     def __repr__(self):

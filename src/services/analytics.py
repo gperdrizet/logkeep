@@ -43,8 +43,9 @@ class AnalyticsService:
         # Count how many times each tag appears across all links
         tag_usage_count = {}
         for link in links:
-            for tag in link.selected_tags:
-                tag_usage_count[tag] = tag_usage_count.get(tag, 0) + 1
+            for tag in link.tags:
+                tag_name = tag.name
+                tag_usage_count[tag_name] = tag_usage_count.get(tag_name, 0) + 1
         
         # Bin tags by their frequency of occurrence
         frequency_bins = {

@@ -2,7 +2,8 @@
 from typing import List, Set
 from sqlalchemy.orm import Session
 
-from src.models.user import User
+from src.models.tag import Tag
+from src.repositories.tag_repository import TagRepository
 from src.repositories.user_repository import UserRepository
 from src.exceptions import ValidationError, NotFoundError
 from src.config import settings
@@ -13,89 +14,67 @@ class TagService:
     
     def __init__(self, db: Session):
         """Initialize service with database session."""
+        self.tag_repo = TagRepository(db)
         self.user_repo = UserRepository(db)
     
-    def add_tag(self, user_id: int, tag: str) -> List[str]:
+    def add_tag(self, user_id: int, tag_name: str) -> Tag:
         """
         Add a tag to user's tag collection.
         
         Args:
             user_id: User ID
-            tag: Tag to add
+            tag_name: Tag name to add
             
         Returns:
-            Updated list of user tags
+            Created or existing Tag object
             
         Raises:
             NotFoundError: If user not found
             ValidationError: If tag invalid or limit exceeded
         """
-        user = self.user_repo.get_by_id(user_id)
-        if not user:
-            raise NotFoundError(f"User not found: {user_id}")
-        
         # Validate tag
-        tag = tag.strip().lstrip('#')
-        if not tag:
+        tag_name = tag_name.strip().lstrip('#')
+        if not tag_name:
             raise ValidationError("Tag cannot be empty")
         
-        if len(tag) > 50:
+        if len(tag_name) > 50:
             raise ValidationError("Tag must be less than 50 characters")
         
-        # Get existing tags
-        user_tags = user.tags or []
-        
         # Check if tag already exists
-        if tag in user_tags:
-            return user_tags
+        existing_tag = self.tag_repo.get_by_name(user_id, tag_name)
+        if existing_tag:
+            return existing_tag
         
         # Check tag limit
-        if len(user_tags) >= settings.max_tags_per_user:
+        tag_count = self.tag_repo.count_user_tags(user_id)
+        if tag_count >= settings.max_tags_per_user:
             raise ValidationError(
                 f"Maximum {settings.max_tags_per_user} tags allowed per user"
             )
         
-        # Add tag
-        user_tags.append(tag)
-        user.tags = user_tags
-        
-        self.user_repo.update(user)
-        return user_tags
+        # Create tag
+        tag = Tag(user_id=user_id, name=tag_name, count=0)
+        return self.tag_repo.create(tag)
     
-    def delete_tag(self, user_id: int, tag: str) -> List[str]:
+    def delete_tag(self, user_id: int, tag_name: str):
         """
         Delete a tag from user's tag collection.
         
         Args:
             user_id: User ID
-            tag: Tag to delete
-            
-        Returns:
-            Updated list of user tags
+            tag_name: Tag name to delete
             
         Raises:
             NotFoundError: If user not found
             ValidationError: If tag not found
         """
-        user = self.user_repo.get_by_id(user_id)
-        if not user:
-            raise NotFoundError(f"User not found: {user_id}")
+        tag = self.tag_repo.get_by_name(user_id, tag_name)
+        if not tag:
+            raise ValidationError(f"Tag not found: {tag_name}")
         
-        # Get existing tags
-        user_tags = user.tags or []
-        
-        # Check if tag exists
-        if tag not in user_tags:
-            raise ValidationError(f"Tag not found: {tag}")
-        
-        # Remove tag
-        user_tags.remove(tag)
-        user.tags = user_tags
-        
-        self.user_repo.update(user)
-        return user_tags
+        self.tag_repo.delete(tag)
     
-    def get_user_tags(self, user_id: int) -> List[str]:
+    def get_user_tags(self, user_id: int) -> List[Tag]:
         """
         Get user's tag collection.
         
@@ -103,38 +82,29 @@ class TagService:
             user_id: User ID
             
         Returns:
-            List of user tags
-            
-        Raises:
-            NotFoundError: If user not found
+            List of Tag objects
         """
-        user = self.user_repo.get_by_id(user_id)
-        if not user:
-            raise NotFoundError(f"User not found: {user_id}")
-        
-        return user.tags or []
+        return self.tag_repo.get_user_tags(user_id)
     
-    def validate_tags(self, tags: List[str], user_tags: List[str]) -> List[str]:
+    def validate_tags(self, tag_names: List[str]) -> List[str]:
         """
-        Validate and normalize tags.
+        Validate and normalize tag names.
         
         Args:
-            tags: Tags to validate
-            user_tags: User's tag collection
+            tag_names: Tag names to validate
             
         Returns:
-            Validated and normalized tags
+            Validated and normalized tag names
             
         Raises:
             ValidationError: If tag validation fails
         """
-        if not tags:
+        if not tag_names:
             return []
         
         validated = []
-        user_tags_set = set(user_tags)
         
-        for tag in tags:
+        for tag in tag_names:
             # Normalize
             tag = tag.strip().lstrip('#')
             
@@ -144,24 +114,52 @@ class TagService:
             if len(tag) > 50:
                 raise ValidationError(f"Tag too long (max 50 chars): {tag}")
             
-            # Note: We now allow tags not in user's collection
-            # They will be auto-created on submit
             validated.append(tag)
         
         return validated
     
     def extract_unique_tags_from_links(self, links) -> Set[str]:
         """
-        Extract unique tags from a list of links.
+        Extract unique tag names from a list of links.
         
         Args:
             links: List of Link objects
             
         Returns:
-            Set of unique tags
+            Set of unique tag names
         """
         all_tags = set()
         for link in links:
             if link.tags:
-                all_tags.update(link.tags)
-        return all_tags
+                all_tags.update(tag.name for tag in link.tags)
+        return all_tags    
+    def get_or_create_tags(self, user_id: int, tag_names: List[str]) -> List[Tag]:
+        """
+        Get or create Tag objects for the given tag names.
+        
+        Args:
+            user_id: User ID
+            tag_names: List of tag names
+            
+        Returns:
+            List of Tag objects
+        """
+        tags = []
+        for name in tag_names:
+            tag = self.tag_repo.get_or_create(user_id, name)
+            tags.append(tag)
+        return tags
+    
+    def search_tags(self, user_id: int, query: str, limit: int = 50) -> List[Tag]:
+        """
+        Search user's tags by name.
+        
+        Args:
+            user_id: User ID
+            query: Search query
+            limit: Maximum results
+            
+        Returns:
+            List of matching Tag objects
+        """
+        return self.tag_repo.search_user_tags(user_id, query, limit)

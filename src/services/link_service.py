@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from src.models.link import Link
+from src.models.tag import Tag
 from src.models import LinkStatus
 from src.repositories.link_repository import LinkRepository
 from src.exceptions import ValidationError, DuplicateError, NotFoundError
@@ -15,13 +16,14 @@ class LinkService:
     def __init__(self, db: Session):
         """Initialize service with database session."""
         self.repository = LinkRepository(db)
+        self.db = db
     
     def submit_link(
         self,
         user_id: int,
         url: str,
         score: float,
-        tags: List[str],
+        tag_objects: List[Tag],
         manual_title: Optional[str] = None
     ) -> Link:
         """
@@ -31,7 +33,7 @@ class LinkService:
             user_id: User ID
             url: Link URL
             score: Link score (0.00-1.00)
-            tags: List of tags
+            tag_objects: List of Tag objects to associate with link
             manual_title: Optional manual title
             
         Returns:
@@ -54,7 +56,6 @@ class LinkService:
             user_id=user_id,
             url=url,
             score=score,
-            selected_tags=tags,
             status=LinkStatus.PENDING,
             submitted_at=datetime.utcnow()
         )
@@ -62,7 +63,16 @@ class LinkService:
         if manual_title:
             link.title = manual_title
         
-        return self.repository.create(link)
+        # Add to session first to get ID
+        self.db.add(link)
+        self.db.flush()
+        
+        # Assign tags
+        link.tags = tag_objects
+        
+        self.db.commit()
+        self.db.refresh(link)
+        return link
     
     def get_link(self, link_id: int, user_id: int) -> Link:
         """
@@ -89,7 +99,7 @@ class LinkService:
         user_id: int,
         title: Optional[str] = None,
         score: Optional[float] = None,
-        tags: Optional[List[str]] = None
+        tag_objects: Optional[List[Tag]] = None
     ) -> Link:
         """
         Update link details.
@@ -99,7 +109,7 @@ class LinkService:
             user_id: User ID (for authorization)
             title: Optional new title
             score: Optional new score
-            tags: Optional new tags list
+            tag_objects: Optional new Tag objects list
             
         Returns:
             Updated link
@@ -118,8 +128,8 @@ class LinkService:
                 raise ValidationError("Score must be between 0.00 and 1.00")
             link.score = score
         
-        if tags is not None:
-            link.selected_tags = tags
+        if tag_objects is not None:
+            link.tags = tag_objects
         
         return self.repository.update(link)
     
@@ -179,7 +189,8 @@ class LinkService:
         user_id: int,
         limit: int = 50,
         offset: int = 0,
-        status: Optional[LinkStatus] = None
+        status: Optional[LinkStatus] = None,
+        tag_names: Optional[List[str]] = None
     ) -> List[Link]:
         """
         Get links for a user.
@@ -189,10 +200,13 @@ class LinkService:
             limit: Maximum number of links to return
             offset: Offset for pagination
             status: Optional status filter
+            tag_names: Optional list of tag names to filter by (all must match)
             
         Returns:
             List of links
         """
+        if tag_names:
+            return self.repository.get_user_links_by_tags(user_id, tag_names, limit, offset)
         return self.repository.get_user_links(user_id, limit, offset, status)
     
     def get_pending_links(self, max_retries: int) -> List[Link]:
