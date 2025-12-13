@@ -17,14 +17,14 @@ class AnalyticsService:
         Returns:
             Tuple of (histogram_data, max_count)
         """
-        score_bins = {i: 0 for i in range(101)}  # 0.00, 0.01, 0.02, ..., 1.00
+        score_bins = {i: 0 for i in range(11)}  # 0.0, 0.1, 0.2, ..., 1.0
         
         for link in links:
             if link.score is not None:
-                bin_index = round(link.score * 100)
+                bin_index = round(link.score * 10)
                 score_bins[bin_index] += 1
         
-        histogram = [{"bin": i/100, "count": score_bins[i]} for i in range(101)]
+        histogram = [{"bin": i/10, "count": score_bins[i]} for i in range(11)]
         max_count = max(score_bins.values()) if score_bins.values() and max(score_bins.values()) > 0 else 1
         
         return histogram, max_count
