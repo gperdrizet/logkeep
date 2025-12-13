@@ -101,10 +101,12 @@
     });
     
     // Handle Enter key
-    tagsInput.addEventListener('keypress', function(e) {
+    tagsInput.addEventListener('keypress', async function(e) {
         if (e.key === 'Enter') {
             e.preventDefault();
             const query = this.value.trim().toLowerCase();
+            
+            if (!query) return;
             
             // If there's an exact match or single filtered result, use it
             if (filteredTags.length === 1) {
@@ -112,7 +114,8 @@
             } else if (userTags.includes(query) && !selectedTags.includes(query)) {
                 addTag(query);
             } else if (query) {
-                alert(`Tag "${query}" doesn't exist in your collection. Add it in the Tags page first.`);
+                // Tag doesn't exist - create it automatically
+                await createAndAddTag(query);
             }
         }
     });
@@ -123,6 +126,31 @@
             suggestionsDiv.style.display = 'none';
         }
     });
+    
+    // Create new tag and add to collection
+    async function createAndAddTag(tag) {
+        try {
+            const formData = new FormData();
+            formData.append('tag', tag);
+            
+            const response = await fetch('/tags/add', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (response.ok) {
+                // Successfully created tag - add to local list and selected tags
+                userTags.push(tag);
+                addTag(tag);
+            } else {
+                const text = await response.text();
+                alert(`Failed to create tag: ${text}`);
+            }
+        } catch (error) {
+            console.error('Error creating tag:', error);
+            alert('Failed to create tag. Please try again.');
+        }
+    }
     
     // Add tag helper function
     function addTag(tag) {
