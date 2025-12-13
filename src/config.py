@@ -1,6 +1,4 @@
 """Application configuration management."""
-import os
-from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
@@ -46,12 +44,12 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         """Check if running in production environment."""
-        return self.environment.lower() == "production"
+        return str(self.environment).lower() == "production"
     
     @property
     def is_development(self) -> bool:
         """Check if running in development environment."""
-        return self.environment.lower() == "development"
+        return str(self.environment).lower() == "development"
 
 
 # Global settings instance

@@ -13,6 +13,9 @@ from dotenv import load_dotenv
 from src.config import settings
 from src.api import auth, links, tags, health
 from src.services.analytics import AnalyticsService
+from src.services.link_service import LinkService
+from src.services.user_service import UserService
+from src.services.tag_service import TagService
 from src.models import LinkStatus
 from src.models.user import User
 from src.models.link import Link
@@ -66,14 +69,12 @@ async def startup_event():
     # Reset stale processing tasks
     db = SessionLocal()
     try:
+        link_service = LinkService(db)
+        
         # Find links that have been processing for more than configured timeout
         stale_threshold = datetime.now() - timedelta(minutes=settings.processing_timeout_minutes)
         
-        stale_links = db.query(Link).filter(
-            Link.status == LinkStatus.PROCESSING,
-            Link.submitted_at < stale_threshold,
-            Link.retry_count < settings.max_retries
-        ).all()
+        stale_links = link_service.get_stale_processing_links(stale_threshold, settings.max_retries)
         
         if stale_links:
             for link in stale_links:
@@ -84,10 +85,7 @@ async def startup_event():
             logger.info(f"Reset {len(stale_links)} stale processing task(s)")
         
         # Process any pending links
-        pending_links = db.query(Link).filter(
-            Link.status == LinkStatus.PENDING,
-            Link.retry_count < settings.max_retries
-        ).all()
+        pending_links = link_service.get_pending_links(settings.max_retries)
         
         if pending_links:
             logger.info(f"Found {len(pending_links)} pending link(s), queueing for processing")
@@ -151,38 +149,42 @@ async def login_submit(
     db: Session = Depends(get_db)
 ):
     """Handle login form submission."""
-    user = db.query(User).filter(User.username == username).first()
+    from src.exceptions import AuthenticationError
     
-    if not user or not verify_password(password, user.hashed_password):
+    try:
+        user_service = UserService(db)
+        user = user_service.authenticate_user(username, password)
+        
+        if not user.is_active:
+            return templates.TemplateResponse(
+                "login.html",
+                {"request": request, "error": "Account is deactivated"},
+                status_code=403
+            )
+        
+        # Create session token
+        access_token = create_access_token(data={"sub": str(user.id)})
+        
+        # Redirect to dashboard with cookie
+        response = RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+        response.set_cookie(
+            key="session",
+            value=access_token,
+            httponly=True,
+            max_age=settings.access_token_expire_minutes * 60,
+            samesite="lax",
+            secure=settings.is_production
+        )
+        
+        logger.info(f"User logged in: {user.username}")
+        return response
+        
+    except AuthenticationError:
         return templates.TemplateResponse(
             "login.html",
             {"request": request, "error": "Invalid username or password"},
             status_code=400
         )
-    
-    if not user.is_active:
-        return templates.TemplateResponse(
-            "login.html",
-            {"request": request, "error": "Account is deactivated"},
-            status_code=403
-        )
-    
-    # Create session token
-    access_token = create_access_token(data={"sub": str(user.id)})
-    
-    # Redirect to dashboard with cookie
-    response = RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
-    response.set_cookie(
-        key="session",
-        value=access_token,
-        httponly=True,
-        max_age=settings.access_token_expire_minutes * 60,
-        samesite="lax",
-        secure=settings.is_production
-    )
-    
-    logger.info(f"User logged in: {user.username}")
-    return response
 
 
 @app.get("/register", response_class=HTMLResponse)
@@ -203,45 +205,22 @@ async def register_submit(
     db: Session = Depends(get_db)
 ):
     """Handle registration form submission."""
-    # Validate username
-    if db.query(User).filter(User.username == username).first():
-        return templates.TemplateResponse(
-            "register.html",
-            {"request": request, "error": "Username already exists"},
-            status_code=400
-        )
+    from src.exceptions import ValidationError, DuplicateError, NotFoundError
     
-    # Validate invite code
-    invite = db.query(Invite).filter(Invite.code == invite_code).first()
-    if not invite or invite.is_used:
-        return templates.TemplateResponse(
-            "register.html",
-            {"request": request, "error": "Invalid or used invite code"},
-            status_code=400
-        )
-    
-    # Create user
     try:
+        # Encrypt GitHub token
         encrypted_token = encrypt_token(github_token)
         
-        user = User(
+        # Create user using service
+        user_service = UserService(db)
+        user = user_service.register_user(
             username=username,
-            hashed_password=get_password_hash(password),
-            encrypted_github_token=encrypted_token,
+            password=password,
+            invite_code=invite_code,
             repo_owner=repo_owner,
             repo_name=repo_name,
-            tags=[],
-            is_active=True
+            github_token=encrypted_token
         )
-        
-        db.add(user)
-        db.flush()
-        
-        # Mark invite as used
-        invite.used_by_user_id = user.id
-        invite.used_at = datetime.now()
-        
-        db.commit()
         
         logger.info(f"New user registered: {username}")
         
@@ -258,6 +237,12 @@ async def register_submit(
         # Redirect to login
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
         
+    except (ValidationError, DuplicateError, NotFoundError) as e:
+        return templates.TemplateResponse(
+            "register.html",
+            {"request": request, "error": str(e)},
+            status_code=400
+        )
     except Exception as e:
         logger.error(f"Registration error: {str(e)}")
         db.rollback()
@@ -284,9 +269,9 @@ async def dashboard(
     db: Session = Depends(get_db)
 ):
     """User dashboard showing recent submissions."""
-    all_links = db.query(Link).filter(
-        Link.user_id == current_user.id
-    ).order_by(Link.submitted_at.desc()).limit(50).all()
+    # Get user links using service
+    link_service = LinkService(db)
+    all_links = link_service.get_user_links(current_user.id, limit=50)
     
     # Apply tag filter if specified
     filter_tag_list = []
@@ -323,9 +308,9 @@ async def data_page(
     db: Session = Depends(get_db)
 ):
     """Data visualization page."""
-    links = db.query(Link).filter(
-        Link.user_id == current_user.id
-    ).order_by(Link.submitted_at.desc()).limit(50).all()
+    # Get user links using service
+    link_service = LinkService(db)
+    links = link_service.get_user_links(current_user.id, limit=50)
     
     # Calculate analytics using service
     analytics = AnalyticsService()
@@ -377,7 +362,8 @@ async def submit_link(
 ):
     """Handle link submission."""
     import json
-    from src.services.processor import validate_url, check_duplicate_url
+    from src.services.processor import validate_url
+    from src.exceptions import ValidationError, DuplicateError
     
     # Validate URL
     if not validate_url(url):
@@ -392,8 +378,31 @@ async def submit_link(
             status_code=400
         )
     
-    # Check duplicate
-    if check_duplicate_url(db, current_user.id, url):
+    # Parse tags
+    try:
+        selected_tags = json.loads(tags_json)
+    except (json.JSONDecodeError, ValueError, TypeError):
+        selected_tags = []
+    
+    # Submit link using service
+    try:
+        link_service = LinkService(db)
+        link = link_service.submit_link(
+            user_id=current_user.id,
+            url=url,
+            score=score or 0.5,
+            tags=selected_tags,
+            manual_title=title if title else None
+        )
+        
+        logger.info(f"Link submitted by {current_user.username}: {url} (ID: {link.id})")
+        
+        # Process in background
+        background_tasks.add_task(process_link, link.id)
+        
+        return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+        
+    except DuplicateError:
         return templates.TemplateResponse(
             "submit.html",
             {
@@ -404,34 +413,17 @@ async def submit_link(
             },
             status_code=409
         )
-    
-    # Parse tags
-    try:
-        selected_tags = json.loads(tags_json)
-    except (json.JSONDecodeError, ValueError, TypeError):
-        selected_tags = []
-    
-    # Create link
-    link = Link(
-        user_id=current_user.id,
-        url=url,
-        title=title if title else None,
-        selected_tags=selected_tags,
-        score=score,
-        status=LinkStatus.PENDING,
-        retry_count=0
-    )
-    
-    db.add(link)
-    db.commit()
-    db.refresh(link)
-    
-    logger.info(f"Link submitted by {current_user.username}: {url} (ID: {link.id})")
-    
-    # Process in background
-    background_tasks.add_task(process_link, link.id)
-    
-    return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+    except ValidationError as e:
+        return templates.TemplateResponse(
+            "submit.html",
+            {
+                "request": request,
+                "user": current_user,
+                "user_tags": sorted(current_user.tags),
+                "error": str(e)
+            },
+            status_code=400
+        )
 
 
 @app.post("/links/{link_id}/title")
@@ -443,28 +435,38 @@ async def update_link_title(
     db: Session = Depends(get_db)
 ):
     """Update title for a link that needs manual title."""
-    link = db.query(Link).filter(
-        Link.id == link_id,
-        Link.user_id == current_user.id
-    ).first()
+    from src.exceptions import NotFoundError
     
-    if not link:
+    try:
+        link_service = LinkService(db)
+        link = link_service.get_link(link_id, current_user.id)
+        
+        if link.status != LinkStatus.NEEDS_TITLE:
+            raise HTTPException(status_code=400, detail="Link does not need title")
+        
+        # Update link
+        link = link_service.update_link(
+            link_id=link_id,
+            user_id=current_user.id,
+            title=title
+        )
+        
+        # Reset status to pending for reprocessing
+        link_service.update_link_status(
+            link_id=link_id,
+            user_id=current_user.id,
+            status=LinkStatus.PENDING
+        )
+        
+        logger.info(f"Title updated for link {link_id}: {title}")
+        
+        # Queue for processing in background
+        background_tasks.add_task(process_link, link.id)
+        
+        return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+        
+    except NotFoundError:
         raise HTTPException(status_code=404, detail="Link not found")
-    
-    if link.status != LinkStatus.NEEDS_TITLE:
-        raise HTTPException(status_code=400, detail="Link does not need title")
-    
-    link.title = title
-    link.status = LinkStatus.PENDING
-    link.error_message = None
-    db.commit()
-    
-    logger.info(f"Title updated for link {link_id}: {title}")
-    
-    # Queue for processing in background
-    background_tasks.add_task(process_link, link.id)
-    
-    return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
 
 
 @app.post("/links/{link_id}/edit")
@@ -481,62 +483,69 @@ async def edit_link(
     """Edit an existing link's title, tags, and score."""
     import json
     from src.services.github import update_link_in_journal
+    from src.exceptions import NotFoundError, ValidationError
     
-    # Get link
-    link = db.query(Link).filter(
-        Link.id == link_id,
-        Link.user_id == current_user.id
-    ).first()
-    
-    if not link:
-        return templates.TemplateResponse(
-            "dashboard.html",
-            {
-                "request": request,
-                "user": current_user,
-                "links": [],
-                "filter_tag_list": [],
-                "error": "Link not found"
-            },
-            status_code=404
-        )
-    
-    # Only allow editing completed links
-    if link.status != LinkStatus.COMPLETED:
-        return RedirectResponse(url="/dashboard?error=Only completed links can be edited", status_code=status.HTTP_302_FOUND)
-    
-    # Parse tags
     try:
-        selected_tags = json.loads(tags_json)
-    except (json.JSONDecodeError, ValueError, TypeError):
-        selected_tags = []
-    
-    # Validate tags exist in user's collection
-    invalid_tags = [tag for tag in selected_tags if tag not in current_user.tags]
-    if invalid_tags:
+        # Get link using service
+        link_service = LinkService(db)
+        link = link_service.get_link(link_id, current_user.id)
+        
+        # Only allow editing completed links
+        if link.status != LinkStatus.COMPLETED:
+            return RedirectResponse(
+                url="/dashboard?error=Only completed links can be edited",
+                status_code=status.HTTP_302_FOUND
+            )
+        
+        # Parse tags
+        try:
+            selected_tags = json.loads(tags_json)
+        except (json.JSONDecodeError, ValueError, TypeError):
+            selected_tags = []
+        
+        # Validate tags exist in user's collection
+        invalid_tags = [tag for tag in selected_tags if tag not in current_user.tags]
+        if invalid_tags:
+            return RedirectResponse(
+                url=f"/dashboard?error=Invalid tags: {', '.join(invalid_tags)}",
+                status_code=status.HTTP_302_FOUND
+            )
+        
+        # Update link using service
+        link = link_service.update_link(
+            link_id=link_id,
+            user_id=current_user.id,
+            title=title.strip(),
+            tags=selected_tags,
+            score=score
+        )
+        
+        logger.info(f"Link {link_id} edited by {current_user.username}: title='{title}', tags={selected_tags}, score={score}")
+        
+        # Update in GitHub
+        success, error_msg = update_link_in_journal(link, db)
+        
+        if success:
+            return RedirectResponse(
+                url="/dashboard?success=Link updated successfully",
+                status_code=status.HTTP_302_FOUND
+            )
+        else:
+            # Rollback would be complex here, so just log and inform user
+            logger.error(f"Failed to update link {link_id} in GitHub: {error_msg}")
+            return RedirectResponse(
+                url=f"/dashboard?error=Link updated in database but failed to update in GitHub: {error_msg}",
+                status_code=status.HTTP_302_FOUND
+            )
+            
+    except NotFoundError:
         return RedirectResponse(
-            url=f"/dashboard?error=Invalid tags: {', '.join(invalid_tags)}",
+            url="/dashboard?error=Link not found",
             status_code=status.HTTP_302_FOUND
         )
-    
-    # Update link data
-    link.title = title.strip()
-    link.selected_tags = selected_tags
-    link.score = score
-    db.commit()
-    
-    logger.info(f"Link {link_id} edited by {current_user.username}: title='{title}', tags={selected_tags}, score={score}")
-    
-    # Update in GitHub
-    success, error_msg = update_link_in_journal(link, db)
-    
-    if success:
-        return RedirectResponse(url="/dashboard?success=Link updated successfully", status_code=status.HTTP_302_FOUND)
-    else:
-        # Rollback would be complex here, so just log and inform user
-        logger.error(f"Failed to update link {link_id} in GitHub: {error_msg}")
+    except ValidationError as e:
         return RedirectResponse(
-            url=f"/dashboard?error=Link updated in database but failed to update in GitHub: {error_msg}",
+            url=f"/dashboard?error={str(e)}",
             status_code=status.HTTP_302_FOUND
         )
 
@@ -566,9 +575,19 @@ async def add_tag(
     db: Session = Depends(get_db)
 ):
     """Add a new tag."""
-    tag = tag.lower().strip()
+    from src.exceptions import ValidationError
     
-    if tag in current_user.tags:
+    try:
+        tag_service = TagService(db)
+        updated_tags = tag_service.add_tag(current_user.id, tag)
+        
+        logger.info(f"Tag added by {current_user.username}: {tag}")
+        
+        return RedirectResponse(url="/tags", status_code=status.HTTP_302_FOUND)
+        
+    except ValidationError as e:
+        # Refresh user to get current tags
+        db.refresh(current_user)
         return templates.TemplateResponse(
             "tags.html",
             {
@@ -576,33 +595,10 @@ async def add_tag(
                 "user": current_user,
                 "tags": sorted(current_user.tags),
                 "max_tags": settings.max_tags_per_user,
-                "error": f"Tag '{tag}' already exists"
-            },
-            status_code=409
-        )
-    
-    if len(current_user.tags) >= settings.max_tags_per_user:
-        return templates.TemplateResponse(
-            "tags.html",
-            {
-                "request": request,
-                "user": current_user,
-                "tags": sorted(current_user.tags),
-                "max_tags": settings.max_tags_per_user,
-                "error": f"Maximum tag limit ({settings.max_tags_per_user}) reached"
+                "error": str(e)
             },
             status_code=400
         )
-    
-    current_user.tags.append(tag)
-    # Mark the attribute as modified for SQLAlchemy to detect the change
-    from sqlalchemy.orm.attributes import flag_modified
-    flag_modified(current_user, "tags")
-    db.commit()
-    
-    logger.info(f"Tag added by {current_user.username}: {tag}")
-    
-    return RedirectResponse(url="/tags", status_code=status.HTTP_302_FOUND)
 
 
 @app.post("/tags/delete/{tag}")
@@ -612,15 +608,15 @@ async def delete_tag(
     db: Session = Depends(get_db)
 ):
     """Delete a tag."""
-    tag = tag.lower()
+    from src.exceptions import ValidationError
     
-    if tag in current_user.tags:
-        current_user.tags.remove(tag)
-        # Mark the attribute as modified for SQLAlchemy to detect the change
-        from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(current_user, "tags")
-        db.commit()
+    try:
+        tag_service = TagService(db)
+        tag_service.delete_tag(current_user.id, tag.lower())
         logger.info(f"Tag deleted by {current_user.username}: {tag}")
+    except ValidationError:
+        # Tag not found, but we can silently ignore
+        pass
     
     return RedirectResponse(url="/tags", status_code=status.HTTP_302_FOUND)
 
