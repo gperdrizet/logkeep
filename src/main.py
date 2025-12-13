@@ -537,6 +537,80 @@ async def update_link_title(
     return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
 
 
+@app.post("/links/{link_id}/edit")
+async def edit_link(
+    link_id: int,
+    request: Request,
+    background_tasks: BackgroundTasks,
+    title: str = Form(...),
+    tags_json: str = Form("[]"),
+    score: Optional[float] = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Edit an existing link's title, tags, and score."""
+    import json
+    from src.services.github import update_link_in_journal
+    
+    # Get link
+    link = db.query(Link).filter(
+        Link.id == link_id,
+        Link.user_id == current_user.id
+    ).first()
+    
+    if not link:
+        return templates.TemplateResponse(
+            "dashboard.html",
+            {
+                "request": request,
+                "user": current_user,
+                "links": [],
+                "filter_tag_list": [],
+                "error": "Link not found"
+            },
+            status_code=404
+        )
+    
+    # Only allow editing completed links
+    if link.status != LinkStatus.COMPLETED:
+        return RedirectResponse(url="/dashboard?error=Only completed links can be edited", status_code=status.HTTP_302_FOUND)
+    
+    # Parse tags
+    try:
+        selected_tags = json.loads(tags_json)
+    except:
+        selected_tags = []
+    
+    # Validate tags exist in user's collection
+    invalid_tags = [tag for tag in selected_tags if tag not in current_user.tags]
+    if invalid_tags:
+        return RedirectResponse(
+            url=f"/dashboard?error=Invalid tags: {', '.join(invalid_tags)}",
+            status_code=status.HTTP_302_FOUND
+        )
+    
+    # Update link data
+    link.title = title.strip()
+    link.selected_tags = selected_tags
+    link.score = score
+    db.commit()
+    
+    logger.info(f"Link {link_id} edited by {current_user.username}: title='{title}', tags={selected_tags}, score={score}")
+    
+    # Update in GitHub
+    success, error_msg = update_link_in_journal(link, db)
+    
+    if success:
+        return RedirectResponse(url="/dashboard?success=Link updated successfully", status_code=status.HTTP_302_FOUND)
+    else:
+        # Rollback would be complex here, so just log and inform user
+        logger.error(f"Failed to update link {link_id} in GitHub: {error_msg}")
+        return RedirectResponse(
+            url=f"/dashboard?error=Link updated in database but failed to update in GitHub: {error_msg}",
+            status_code=status.HTTP_302_FOUND
+        )
+
+
 @app.get("/tags", response_class=HTMLResponse)
 async def tags_page(
     request: Request,
