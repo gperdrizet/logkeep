@@ -18,6 +18,41 @@
 {% endif %}
 
 {% if links %}
+<div class="histogram-container">
+    <div class="histogram-card">
+        <h3 class="histogram-title">Score Distribution</h3>
+        <div class="histogram">
+            {% for item in score_histogram %}
+            <div class="histogram-bar-wrapper">
+                <div class="histogram-bar" style="height: {{ (item.count / max_score_count * 100)|round }}%;" title="{{ item.count }} articles">
+                    {% if item.count > 0 %}
+                    <span class="histogram-count">{{ item.count }}</span>
+                    {% endif %}
+                </div>
+                <div class="histogram-label">{{ "%.1f"|format(item.bin) }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="histogram-card">
+        <h3 class="histogram-title">Tag Count Distribution</h3>
+        <div class="histogram">
+            {% for item in tag_histogram %}
+            <div class="histogram-bar-wrapper">
+                <div class="histogram-bar" style="height: {{ (item.count / max_tag_count * 100)|round }}%;" title="{{ item.count }} articles">
+                    {% if item.count > 0 %}
+                    <span class="histogram-count">{{ item.count }}</span>
+                    {% endif %}
+                </div>
+                <div class="histogram-label">{{ item.bin }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% if links %}
     {% for link in links %}
     <div class="link-item">
         <div class="link-header">
@@ -42,8 +77,8 @@
             {% for tag in link.selected_tags %}
             <span class="tag">#{{ tag }}</span>
             {% endfor %}
-            {% if link.score %}
-            <span class="tag" style="background-color: #6b7280;">{{ link.score }}</span>
+            {% if link.score is not none %}
+            <span class="tag" style="background-color: #6b7280;">{{ "%.1f"|format(link.score) }}</span>
             {% endif %}
         </div>
         {% endif %}

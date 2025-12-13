@@ -144,7 +144,7 @@ select:focus {
     background-color: white;
 }
 
-/* Score Slider */
+/* Score Slider (0-1 range) */
 input[type="range"].score-slider {
     width: 100%;
     height: 48px;
@@ -301,6 +301,97 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
     font-size: 18px;
     font-weight: 600;
     margin-bottom: 12px;
+}
+
+/* Histograms */
+.histogram-container {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.histogram-card {
+    background-color: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.histogram-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--text-color);
+}
+
+.histogram {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 150px;
+    gap: 4px;
+    padding: 8px 0;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.histogram-bar-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+}
+
+.histogram-bar {
+    width: 100%;
+    background: linear-gradient(to top, var(--primary-color), var(--primary-hover));
+    border-radius: 4px 4px 0 0;
+    min-height: 2px;
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    transition: opacity 0.2s;
+}
+
+.histogram-bar:hover {
+    opacity: 0.8;
+}
+
+.histogram-count {
+    font-size: 10px;
+    font-weight: 600;
+    color: white;
+    padding: 2px 4px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.histogram-label {
+    font-size: 11px;
+    color: #6b7280;
+    margin-top: 4px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+    .histogram-container {
+        grid-template-columns: 1fr 1fr;
+    }
+    
+    .histogram {
+        height: 180px;
+    }
+    
+    .histogram-count {
+        font-size: 12px;
+    }
+    
+    .histogram-label {
+        font-size: 12px;
+    }
 }
 
 /* Link List */

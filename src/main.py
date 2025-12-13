@@ -272,12 +272,36 @@ async def dashboard(
         Link.user_id == current_user.id
     ).order_by(Link.submitted_at.desc()).limit(50).all()
     
+    # Calculate histogram data for scores
+    score_bins = {i: 0 for i in range(11)}  # 0.0, 0.1, 0.2, ..., 1.0
+    for link in links:
+        if link.score is not None:
+            bin_index = round(link.score * 10)
+            score_bins[bin_index] += 1
+    
+    # Calculate histogram data for tag counts
+    tag_count_bins = {}
+    for link in links:
+        tag_count = len(link.selected_tags)
+        tag_count_bins[tag_count] = tag_count_bins.get(tag_count, 0) + 1
+    
+    # Prepare data for templates
+    score_histogram = [{"bin": i/10, "count": score_bins[i]} for i in range(11)]
+    max_score_count = max(score_bins.values()) if score_bins.values() else 1
+    
+    tag_histogram = [{"bin": k, "count": v} for k, v in sorted(tag_count_bins.items())]
+    max_tag_count = max(tag_count_bins.values()) if tag_count_bins.values() else 1
+    
     return templates.TemplateResponse(
         "dashboard.html",
         {
             "request": request,
             "user": current_user,
-            "links": links
+            "links": links,
+            "score_histogram": score_histogram,
+            "max_score_count": max_score_count,
+            "tag_histogram": tag_histogram,
+            "max_tag_count": max_tag_count
         }
     )
 
