@@ -28,3 +28,6 @@ click==8.1.8
 
 # Utilities
 python-dotenv==1.0.1
+
+# LLM Integration
+httpx==0.27.0

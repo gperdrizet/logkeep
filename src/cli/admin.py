@@ -376,5 +376,156 @@ def import_tags(username):
         db.close()
 
 
+@cli.command('backfill-summaries')
+@click.argument('username')
+def backfill_summaries(username):
+    """Generate summaries for existing completed links."""
+    from src.config import settings
+    from src.services.processor import is_summarizable_url, extract_and_truncate_article
+    from src.services.llm import get_llm_service
+    from src.utils.logging import logger
+    
+    if not settings.llm_enabled:
+        click.echo("✗ LLM service is not enabled. Set LLM_ENABLED=true in .env", err=True)
+        sys.exit(1)
+    
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            click.echo(f"✗ User '{username}' not found", err=True)
+            sys.exit(1)
+        
+        # Query links that need summarization
+        links_to_summarize = db.query(Link).filter(
+            Link.user_id == user.id,
+            Link.status == LinkStatus.COMPLETED,
+            Link.summary.is_(None),
+            Link.summary_error.is_(None),
+            Link.summary_retry_count < settings.llm_max_retries
+        ).all()
+        
+        total = len(links_to_summarize)
+        if total == 0:
+            click.echo("No links need summarization")
+            return
+        
+        click.echo(f"Found {total} link(s) to summarize for user '{username}'")
+        click.echo("Starting backfill (this may take a while)...\n")
+        
+        llm_service = get_llm_service()
+        success_count = 0
+        failed_count = 0
+        
+        for i, link in enumerate(links_to_summarize, 1):
+            click.echo(f"[{i}/{total}] Processing: {link.title[:50] if link.title else link.url[:50]}...")
+            
+            try:
+                # Check if summarizable
+                is_summarizable, skip_reason = is_summarizable_url(link.url)
+                if not is_summarizable:
+                    link.summary_error = skip_reason
+                    db.commit()
+                    click.echo(f"  ⊘ Skipped: {skip_reason}")
+                    failed_count += 1
+                    continue
+                
+                # Extract content
+                content, extractable, extract_error = extract_and_truncate_article(link.url)
+                if not extractable or not content:
+                    link.summary_error = extract_error or "Article content unavailable"
+                    db.commit()
+                    click.echo(f"  ⊘ Failed: {extract_error}")
+                    failed_count += 1
+                    continue
+                
+                # Generate summary
+                success, summary, error = llm_service.summarize(content, link.title, link.url)
+                if success and summary:
+                    link.summary = summary
+                    link.summarized_at = datetime.now()
+                    link.llm_model = settings.llm_model_name
+                    link.summary_error = None
+                    db.commit()
+                    click.echo(f"  ✓ Summary generated ({len(summary)} chars)")
+                    success_count += 1
+                else:
+                    link.summary_retry_count += 1
+                    link.summary_error = (error or "Summarization failed")[:500]
+                    db.commit()
+                    click.echo(f"  ✗ Failed: {error}")
+                    failed_count += 1
+                    logger.error(f"Backfill failed for link {link.id}: {error}")
+                    
+            except Exception as e:
+                link.summary_retry_count += 1
+                link.summary_error = "Summarization failed"[:500]
+                db.commit()
+                click.echo(f"  ✗ Error: {str(e)}")
+                failed_count += 1
+                logger.error(f"Backfill error for link {link.id}: {e}", exc_info=True)
+        
+        click.echo(f"\n✓ Backfill complete: {success_count} summaries generated, {failed_count} failures")
+        
+    except Exception as e:
+        click.echo(f"✗ Error during backfill: {str(e)}", err=True)
+        sys.exit(1)
+    finally:
+        db.close()
+
+
+@cli.command('reset-summary-retries')
+@click.argument('username')
+@click.option('--link-id', type=int, help='Reset specific link (optional, resets all if not specified)')
+def reset_summary_retries(username, link_id):
+    """Reset summary retry count for failed links."""
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            click.echo(f"✗ User '{username}' not found", err=True)
+            sys.exit(1)
+        
+        if link_id:
+            # Reset specific link
+            link = db.query(Link).filter(
+                Link.id == link_id,
+                Link.user_id == user.id
+            ).first()
+            
+            if not link:
+                click.echo(f"✗ Link {link_id} not found for user '{username}'", err=True)
+                sys.exit(1)
+            
+            link.summary_retry_count = 0
+            link.summary_error = None
+            db.commit()
+            click.echo(f"✓ Reset retry count for link {link_id}")
+        else:
+            # Reset all failed links for user
+            links = db.query(Link).filter(
+                Link.user_id == user.id,
+                Link.summary_error.isnot(None)
+            ).all()
+            
+            count = len(links)
+            if count == 0:
+                click.echo("No failed links found")
+                return
+            
+            for link in links:
+                link.summary_retry_count = 0
+                link.summary_error = None
+            
+            db.commit()
+            click.echo(f"✓ Reset retry count for {count} link(s)")
+        
+    except Exception as e:
+        click.echo(f"✗ Error resetting retries: {str(e)}", err=True)
+        sys.exit(1)
+    finally:
+        db.close()
+
+
 if __name__ == '__main__':
     cli()

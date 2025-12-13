@@ -20,6 +20,13 @@ class Link(Base):
     error_message = Column(Text, nullable=True)
     submitted_at = Column(DateTime, default=datetime.now, nullable=False)
     processed_at = Column(DateTime, nullable=True)
+    
+    # LLM Summarization fields
+    summary = Column(Text, nullable=True)  # Generated article summary
+    summarized_at = Column(DateTime, nullable=True)  # When summary was generated
+    llm_model = Column(String(100), nullable=True)  # Model used for summarization
+    summary_error = Column(String(500), nullable=True)  # User-friendly error message
+    summary_retry_count = Column(Integer, nullable=False, default=0)  # Summarization retry attempts
 
     # Relationships
     user = relationship("User", back_populates="links")

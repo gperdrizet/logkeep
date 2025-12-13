@@ -87,6 +87,71 @@ def extract_title_from_url(url: str, timeout: int = None) -> Optional[str]:
         return None
 
 
+def is_summarizable_url(url: str) -> Tuple[bool, Optional[str]]:
+    """
+    Check if a URL points to content that can be summarized.
+    
+    Args:
+        url: URL to check
+        
+    Returns:
+        Tuple of (is_summarizable: bool, error_reason: Optional[str])
+    """
+    url_lower = url.lower()
+    
+    # Check for PDF documents
+    if url_lower.endswith('.pdf'):
+        return False, "PDF documents cannot be summarized"
+    
+    return True, None
+
+
+def extract_and_truncate_article(url: str) -> Tuple[Optional[str], bool, Optional[str]]:
+    """
+    Extract full article content from URL and truncate to token limit.
+    
+    Args:
+        url: URL to extract content from
+        
+    Returns:
+        Tuple of (content: Optional[str], is_summarizable: bool, error_reason: Optional[str])
+    """
+    try:
+        # Fetch the page
+        downloaded = trafilatura.fetch_url(url)
+        if not downloaded:
+            logger.warning(f"Failed to fetch URL: {url}")
+            return None, False, "Article content unavailable"
+        
+        # Extract full article content
+        content = trafilatura.extract(
+            downloaded,
+            include_comments=False,
+            include_tables=True,
+            no_fallback=False
+        )
+        
+        if not content or len(content.strip()) < 200:
+            logger.warning(f"Insufficient content extracted from {url} ({len(content) if content else 0} chars)")
+            return None, False, "Article content unavailable"
+        
+        # Truncate to token limit using word-based estimation
+        words = content.split()
+        estimated_tokens = len(words) / 0.75  # Rough approximation: 1 token ≈ 0.75 words
+        
+        if estimated_tokens > settings.llm_max_input_tokens:
+            max_words = int(settings.llm_max_input_tokens * 0.75)
+            content = ' '.join(words[:max_words])
+            logger.info(f"Truncated article from {len(words)} to {max_words} words (est. {settings.llm_max_input_tokens} tokens)")
+        
+        logger.info(f"Extracted {len(content)} chars from {url}")
+        return content, True, None
+        
+    except Exception as e:
+        logger.error(f"Error extracting content from {url}: {str(e)}")
+        return None, False, "Article content unavailable"
+
+
 def validate_url(url: str) -> bool:
     """
     Validate URL format.
@@ -185,6 +250,66 @@ def process_link(link_id: int) -> None:
             link.error_message = None
             db.commit()
             logger.info(f"Link {link_id} processed successfully")
+            
+            # Attempt summarization if enabled
+            # NOTE: This is sequential processing. For concurrent processing:
+            # 1. Remove time.sleep delays below
+            # 2. Add asyncio.Semaphore for GPU access control
+            # 3. Use async/await pattern
+            # 4. Increase ThreadPoolExecutor max_workers
+            if settings.llm_enabled and settings.summarize_on_submit:
+                logger.info(f"Attempting to summarize link {link_id}")
+                
+                # Check if URL is summarizable
+                is_summarizable, skip_reason = is_summarizable_url(link.url)
+                if not is_summarizable:
+                    link.summary_error = skip_reason
+                    db.commit()
+                    logger.info(f"Link {link_id} skipped summarization: {skip_reason}")
+                else:
+                    # Extract article content
+                    content, extractable, extract_error = extract_and_truncate_article(link.url)
+                    
+                    if not extractable or not content:
+                        link.summary_error = extract_error or "Article content unavailable"
+                        db.commit()
+                        logger.warning(f"Link {link_id} content extraction failed: {extract_error}")
+                    else:
+                        # Try to generate summary with retry logic
+                        from src.services.llm import get_llm_service
+                        import time
+                        
+                        llm_service = get_llm_service()
+                        
+                        for attempt in range(settings.llm_max_retries):
+                            success_summary, summary, error_summary = llm_service.summarize(
+                                content, link.title, link.url
+                            )
+                            
+                            if success_summary and summary:
+                                # Summary generated successfully
+                                link.summary = summary
+                                link.summarized_at = datetime.now()
+                                link.llm_model = settings.llm_model_name
+                                link.summary_error = None
+                                db.commit()
+                                logger.info(f"Link {link_id} summarized successfully")
+                                break
+                            else:
+                                # Summarization failed
+                                link.summary_retry_count += 1
+                                db.commit()
+                                
+                                if attempt < settings.llm_max_retries - 1:
+                                    # Wait before retry with exponential backoff
+                                    delay = settings.llm_retry_delays[attempt]
+                                    logger.warning(f"Link {link_id} summarization failed (attempt {attempt + 1}/{settings.llm_max_retries}), retrying in {delay}s: {error_summary}")
+                                    time.sleep(delay)
+                                else:
+                                    # Final failure
+                                    link.summary_error = (error_summary or "Summarization failed")[:500]
+                                    db.commit()
+                                    logger.error(f"Link {link_id} summarization failed after {settings.llm_max_retries} attempts: {error_summary}")
         else:
             # GitHub commit failed - retry logic
             link.retry_count += 1

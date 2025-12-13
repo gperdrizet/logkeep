@@ -66,7 +66,7 @@ async def startup_event():
     """Application startup tasks."""
     logger.info("Starting LogKeep application...")
     
-    # Reset stale processing tasks
+        # Reset stale processing tasks
     db = SessionLocal()
     try:
         link_service = LinkService(db)
@@ -83,6 +83,16 @@ async def startup_event():
             
             db.commit()
             logger.info(f"Reset {len(stale_links)} stale processing task(s)")
+        
+        # Check LLM service availability if enabled
+        if settings.llm_enabled:
+            import httpx
+            try:
+                response = httpx.get(f"{settings.llm_base_url}/api/tags", timeout=10)
+                response.raise_for_status()
+                logger.info("LLM service ready")
+            except Exception as e:
+                logger.warning(f"LLM service unavailable, summarization disabled: {e}")
         
         # Process any pending links
         pending_links = link_service.get_pending_links(settings.max_retries)
@@ -269,37 +279,48 @@ async def dashboard(
     db: Session = Depends(get_db)
 ):
     """User dashboard showing recent submissions."""
-    # Get user links using service
-    link_service = LinkService(db)
+    all_links = db.query(Link).filter(
+        Link.user_id == current_user.id
+    ).order_by(Link.submitted_at.desc()).limit(50).all()
     
-    # Parse tag filter
+    # Apply tag filter if specified
     filter_tag_list = []
     if filter_tags:
         filter_tag_list = [tag.strip() for tag in filter_tags.split(',') if tag.strip()]
+        # Filter links that have ALL the specified tags
+        links = []
+        for link in all_links:
+            link_tag_names = [tag.name for tag in link.tags]
+            if all(filter_tag in link_tag_names for filter_tag in filter_tag_list):
+                links.append(link)
+    else:
+        links = all_links
     
-    # Get links with optional tag filtering at database level
-    links = link_service.get_user_links(
-        current_user.id, 
-        limit=50, 
-        tag_names=filter_tag_list if filter_tag_list else None
-    )
+    # Add tag_names attribute and check for pending summaries
+    any_pending_summaries = False
+    for link in links:
+        link.tag_names = [tag.name for tag in link.tags]
+        # Check if link has pending summary (completed but no summary/error yet)
+        link.has_pending_summary = (
+            link.status == LinkStatus.COMPLETED and 
+            link.summary is None and 
+            link.summary_error is None
+        )
+        if link.has_pending_summary:
+            any_pending_summaries = True
     
-    # Calculate analytics using service
-    analytics = AnalyticsService()
-    score_histogram, max_score_count = analytics.calculate_score_histogram(links)
-    tag_histogram, max_tag_count = analytics.calculate_tag_frequency_histogram(links)
+    # Get user tags as list of names
+    user_tag_names = [tag.name for tag in current_user.tags] if current_user.tags else []
     
     return templates.TemplateResponse(
         "dashboard.html",
         {
             "request": request,
             "user": current_user,
+            "any_pending_summaries": any_pending_summaries,
+            "user_tags": user_tag_names,
             "links": links,
-            "filter_tag_list": filter_tag_list,
-            "score_histogram": score_histogram,
-            "max_score_count": max_score_count,
-            "tag_histogram": tag_histogram,
-            "max_tag_count": max_tag_count
+            "filter_tag_list": filter_tag_list
         }
     )
 
@@ -311,17 +332,52 @@ async def data_page(
     db: Session = Depends(get_db)
 ):
     """Data visualization page."""
-    # Get user links using service
-    link_service = LinkService(db)
-    links = link_service.get_user_links(current_user.id, limit=50)
+    links = db.query(Link).filter(
+        Link.user_id == current_user.id
+    ).order_by(Link.submitted_at.desc()).limit(50).all()
     
-    # Calculate analytics using service
-    analytics = AnalyticsService()
-    score_histogram, max_score_count = analytics.calculate_score_histogram(links)
+    # Calculate histogram data for scores
+    score_bins = {i: 0 for i in range(11)}  # 0.0, 0.1, 0.2, ..., 1.0
+    for link in links:
+        if link.score is not None:
+            bin_index = round(link.score * 10)
+            score_bins[bin_index] += 1
     
-    # Use stored tag counts for tag histogram
-    tag_counts = current_user.tag_counts if current_user.tag_counts else {}
-    tag_histogram, max_tag_count = analytics.calculate_tag_collection_histogram(tag_counts)
+    # Calculate tag usage from links
+    tag_usage_count = {}
+    for link in links:
+        if link.tags:
+            for tag in link.tags:
+                tag_name = tag.name
+                tag_usage_count[tag_name] = tag_usage_count.get(tag_name, 0) + 1
+    
+    # Bin tags by their count in links
+    frequency_bins = {
+        "1": 0,
+        "2-3": 0,
+        "4-6": 0,
+        "7-9": 0,
+        "10+": 0
+    }
+    
+    for count in tag_usage_count.values():
+        if count == 1:
+            frequency_bins["1"] += 1
+        elif 2 <= count <= 3:
+            frequency_bins["2-3"] += 1
+        elif 4 <= count <= 6:
+            frequency_bins["4-6"] += 1
+        elif 7 <= count <= 9:
+            frequency_bins["7-9"] += 1
+        else:
+            frequency_bins["10+"] += 1
+    
+    # Prepare data for templates
+    score_histogram = [{"bin": i/10, "count": score_bins[i]} for i in range(11)]
+    max_score_count = max(score_bins.values()) if score_bins.values() and max(score_bins.values()) > 0 else 1
+    
+    tag_histogram = [{"bin": k, "count": v} for k, v in frequency_bins.items()]
+    max_tag_count = max(frequency_bins.values()) if frequency_bins.values() and max(frequency_bins.values()) > 0 else 1
     
     return templates.TemplateResponse(
         "data.html",
@@ -342,12 +398,15 @@ async def submit_page(
     current_user: User = Depends(get_current_user)
 ):
     """Link submission page."""
+    # Get user tags as list of names
+    user_tags = [tag.name for tag in current_user.tags] if current_user.tags else []
+    
     return templates.TemplateResponse(
         "submit.html",
         {
             "request": request,
             "user": current_user,
-            "user_tags": sorted([tag.name for tag in current_user.tags])
+            "user_tags": sorted(user_tags)
         }
     )
 
@@ -511,19 +570,29 @@ async def edit_link(
         except (json.JSONDecodeError, ValueError, TypeError):
             tag_names = []
         
-        # Validate tags exist in user's collection
-        user_tag_names = {tag.name for tag in current_user.tags}
-        invalid_tags = [tag for tag in tag_names if tag not in user_tag_names]
-        if invalid_tags:
-            return RedirectResponse(
-                url=f"/dashboard?error=Invalid tags: {', '.join(invalid_tags)}",
-                status_code=status.HTTP_302_FOUND
-            )
-        
-        # Get Tag objects
-        tag_service = TagService(db)
-        tag_objects = [tag_service.tag_repo.get_by_name(current_user.id, name) for name in tag_names]
-        tag_objects = [t for t in tag_objects if t is not None]  # Filter out None values
+        # Get or create Tag objects
+        from src.models.tag import Tag
+        tag_objects = []
+        for tag_name in tag_names:
+            tag_name = tag_name.strip().lower()
+            if not tag_name:
+                continue
+            
+            # Try to get existing tag
+            existing_tag = db.query(Tag).filter(
+                Tag.user_id == current_user.id,
+                Tag.name == tag_name
+            ).first()
+            
+            if existing_tag:
+                tag_objects.append(existing_tag)
+            else:
+                # Create new tag
+                new_tag = Tag(user_id=current_user.id, name=tag_name)
+                db.add(new_tag)
+                db.flush()  # Get the ID without committing
+                tag_objects.append(new_tag)
+                logger.info(f"Created new tag '{tag_name}' for user {current_user.username}")
         
         # Update link using service
         link = link_service.update_link(
