@@ -35,6 +35,18 @@ app.mount("/static", StaticFiles(directory="src/static"), name="static")
 # Setup templates
 templates = Jinja2Templates(directory="src/templates")
 
+# Add custom Jinja2 filter for cleaning URLs
+def clean_url_display(url: str) -> str:
+    """Remove common URL prefixes and trailing slashes for cleaner display."""
+    prefixes = ['https://www.', 'http://www.', 'https://', 'http://']
+    for prefix in prefixes:
+        if url.startswith(prefix):
+            url = url[len(prefix):]
+            break
+    return url.rstrip('/')
+
+templates.env.filters['clean_url'] = clean_url_display
+
 # Include API routers
 app.include_router(auth.router)
 app.include_router(links.router)
@@ -264,13 +276,22 @@ async def logout():
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(
     request: Request,
+    filter_tags: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """User dashboard showing recent submissions."""
-    links = db.query(Link).filter(
+    all_links = db.query(Link).filter(
         Link.user_id == current_user.id
     ).order_by(Link.submitted_at.desc()).limit(50).all()
+    
+    # Apply tag filter if specified
+    filter_tag_list = []
+    if filter_tags:
+        filter_tag_list = [tag.strip() for tag in filter_tags.split(',') if tag.strip()]
+        links = [link for link in all_links if all(tag in link.selected_tags for tag in filter_tag_list)]
+    else:
+        links = all_links
     
     # Calculate histogram data for scores
     score_bins = {i: 0 for i in range(11)}  # 0.0, 0.1, 0.2, ..., 1.0
@@ -324,6 +345,7 @@ async def dashboard(
             "request": request,
             "user": current_user,
             "links": links,
+            "filter_tag_list": filter_tag_list,
             "score_histogram": score_histogram,
             "max_score_count": max_score_count,
             "tag_histogram": tag_histogram,
@@ -350,34 +372,32 @@ async def data_page(
             bin_index = round(link.score * 10)
             score_bins[bin_index] += 1
     
-    # Calculate histogram data for tag usage frequency
+    # Calculate histogram data for tag usage frequency from stored counts
     tag_usage_count = {}
-    for link in links:
-        for tag in link.selected_tags:
-            tag_usage_count[tag] = tag_usage_count.get(tag, 0) + 1
+    for tag in current_user.tags:
+        # Use stored count from tag_counts, default to 0 if not found
+        tag_usage_count[tag] = current_user.tag_counts.get(tag, 0) if current_user.tag_counts else 0
     
     frequency_bins = {
         "1": 0,
-        "2-3": 0,
-        "4-6": 0,
-        "7-10": 0,
-        "11-15": 0,
-        "16+": 0
+        "2": 0,
+        "3": 0,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0,
+        "10+": 0
     }
     
     for count in tag_usage_count.values():
-        if count == 1:
-            frequency_bins["1"] += 1
-        elif 2 <= count <= 3:
-            frequency_bins["2-3"] += 1
-        elif 4 <= count <= 6:
-            frequency_bins["4-6"] += 1
-        elif 7 <= count <= 10:
-            frequency_bins["7-10"] += 1
-        elif 11 <= count <= 15:
-            frequency_bins["11-15"] += 1
-        else:
-            frequency_bins["16+"] += 1
+        if count == 0:
+            continue  # Skip tags with 0 count
+        elif 1 <= count <= 9:
+            frequency_bins[str(count)] += 1
+        else:  # count >= 10
+            frequency_bins["10+"] += 1
     
     score_histogram = [{"bin": i/10, "count": score_bins[i]} for i in range(11)]
     max_score_count = max(score_bins.values()) if score_bins.values() and max(score_bins.values()) > 0 else 1
@@ -523,7 +543,7 @@ async def tags_page(
     current_user: User = Depends(get_current_user)
 ):
     """Tag management page."""
-    max_tags = int(os.getenv("MAX_TAGS_PER_USER", "100"))
+    max_tags = int(os.getenv("MAX_TAGS_PER_USER", "1000"))
     return templates.TemplateResponse(
         "tags.html",
         {
@@ -543,7 +563,7 @@ async def add_tag(
     db: Session = Depends(get_db)
 ):
     """Add a new tag."""
-    max_tags = int(os.getenv("MAX_TAGS_PER_USER", "100"))
+    max_tags = int(os.getenv("MAX_TAGS_PER_USER", "1000"))
     tag = tag.lower().strip()
     
     if tag in current_user.tags:

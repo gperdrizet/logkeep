@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}Manage Tags - LogKeep{% endblock %}
+{% block title %}Tags - LogKeep{% endblock %}
 
 {% block content %}
-<h2>Manage Tags</h2>
+<h2>Tags</h2>
 
 {% if error %}
 <div class="alert alert-error">
@@ -18,30 +18,22 @@
 {% endif %}
 
 <div class="card">
-    <h3 class="card-title">Add New Tag</h3>
     <form action="/tags/add" method="post">
         <div class="form-group">
-            <label for="tag">Tag Name</label>
-            <input type="text" id="tag" name="tag" placeholder="my-tag" pattern="[a-zA-Z0-9_-]+" maxlength="50" required autofocus>
-            <small style="color: #6b7280;">
-                Letters, numbers, hyphens, and underscores only. 
-                Maximum {{ max_tags }} tags total.
-            </small>
+            <input type="text" id="tag" name="tag" placeholder="Letters, numbers, hyphens, and underscores only" pattern="[a-zA-Z0-9_-]+" maxlength="50" required autofocus>
         </div>
-        <button type="submit" class="btn btn-primary">Add Tag</button>
+        <button type="submit" class="btn btn-primary">Add</button>
     </form>
 </div>
 
 <div class="card">
-    <h3 class="card-title">Your Tags ({{ tags|length }}/{{ max_tags }})</h3>
-    
     {% if tags %}
     <div class="tag-list">
         {% for tag in tags %}
         <div class="tag-item">
-            <span>#{{ tag }}</span>
+            <span>{{ tag }}</span>
             <form action="/tags/delete/{{ tag }}" method="post" style="display: inline;">
-                <button type="submit" title="Remove tag" onclick="return confirm('Remove tag #{{ tag }}?')">×</button>
+                <button type="submit" title="Remove tag" onclick="return confirm('Remove tag {{ tag }}?')">×</button>
             </form>
         </div>
         {% endfor %}

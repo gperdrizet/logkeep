@@ -106,7 +106,7 @@ ENCRYPTION_KEY=your-fernet-key-here
 DATABASE_URL=sqlite:///data/logkeep.db
 
 # Limits
-MAX_TAGS_PER_USER=100
+MAX_TAGS_PER_USER=1000
 MAX_RETRY_COUNT=3
 
 # Logging

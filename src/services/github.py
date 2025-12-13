@@ -190,8 +190,8 @@ def import_tags_from_journals(user: User, db: Session) -> Tuple[int, Optional[st
                 return 0, None
             raise
         
-        # Collect all tags from journal files
-        all_tags = set()
+        # Collect all tags from journal files with counts
+        tag_counts = {}
         file_count = 0
         
         # Filter for markdown files
@@ -203,7 +203,9 @@ def import_tags_from_journals(user: User, db: Session) -> Tuple[int, Optional[st
                 # Extract hashtags using regex
                 # Matches #word, #word-with-dashes, #word_with_underscores
                 tags = re.findall(r'#([\w-]+)', content)
-                all_tags.update(tag.lower() for tag in tags)
+                for tag in tags:
+                    tag_lower = tag.lower()
+                    tag_counts[tag_lower] = tag_counts.get(tag_lower, 0) + 1
                 file_count += 1
             except Exception as e:
                 logger.warning(f"Error reading journal file {file.name}: {str(e)}")
@@ -212,17 +214,24 @@ def import_tags_from_journals(user: User, db: Session) -> Tuple[int, Optional[st
         # Filter out system tags and tags that don't match our validation
         excluded_tags = {'links', 'link', 'todo', 'done', 'later', 'now', 'doing', 'waiting'}
         valid_tags = {
-            tag for tag in all_tags
+            tag for tag in tag_counts.keys()
             if tag not in excluded_tags
             and len(tag) <= 50
             and re.match(r'^[a-zA-Z0-9_-]+$', tag)
         }
         
-        # Add new tags to user's collection
+        # Add new tags to user's collection and update counts
         new_tags = [tag for tag in valid_tags if tag not in user.tags]
         
+        # Update tag counts for all valid tags (new and existing)
+        if not user.tag_counts:
+            user.tag_counts = {}
+        
+        for tag in valid_tags:
+            user.tag_counts[tag] = tag_counts[tag]
+        
         if new_tags:
-            max_tags = int(os.getenv("MAX_TAGS_PER_USER", "100"))
+            max_tags = int(os.getenv("MAX_TAGS_PER_USER", "1000"))
             available_slots = max_tags - len(user.tags)
             
             if available_slots > 0:
@@ -232,6 +241,7 @@ def import_tags_from_journals(user: User, db: Session) -> Tuple[int, Optional[st
                 # Mark as modified for SQLAlchemy
                 from sqlalchemy.orm.attributes import flag_modified
                 flag_modified(user, "tags")
+                flag_modified(user, "tag_counts")
                 db.commit()
                 
                 logger.info(f"Imported {len(tags_to_add)} tags from {file_count} journal files for user {user.username}")
@@ -240,7 +250,11 @@ def import_tags_from_journals(user: User, db: Session) -> Tuple[int, Optional[st
                 logger.warning(f"User {user.username} already has maximum tags ({max_tags})")
                 return 0, f"Tag collection already at maximum ({max_tags})"
         else:
-            logger.info(f"No new tags found in journals for user {user.username}")
+            # Even if no new tags, update counts for existing tags
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(user, "tag_counts")
+            db.commit()
+            logger.info(f"No new tags found in journals for user {user.username}, updated counts for existing tags")
             return 0, None
         
     except GithubException as e:

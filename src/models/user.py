@@ -16,6 +16,7 @@ class User(Base):
     repo_owner = Column(String(255), nullable=False)
     repo_name = Column(String(255), nullable=False)
     tags = Column(JSON, nullable=False, default=list)  # Array of tag strings
+    tag_counts = Column(JSON, nullable=False, default=dict)  # Dict mapping tag to count from journals
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.now, nullable=False)
 

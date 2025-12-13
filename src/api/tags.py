@@ -14,7 +14,7 @@ load_dotenv()
 
 router = APIRouter(prefix="/api/tags", tags=["tags"])
 
-MAX_TAGS_PER_USER = int(os.getenv("MAX_TAGS_PER_USER", "100"))
+MAX_TAGS_PER_USER = int(os.getenv("MAX_TAGS_PER_USER", "1000"))
 
 
 class AddTagRequest(BaseModel):

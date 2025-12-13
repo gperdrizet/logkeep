@@ -5,6 +5,31 @@
 {% block content %}
 <h2>Links</h2>
 
+<div class="card" style="margin-bottom: 20px;">
+    <form action="/dashboard" method="get" id="filter-form">
+        <div class="form-group" style="margin-bottom: 0;">
+            <input type="text" id="filter_tag_input" placeholder="Add tag to filter..." list="tag-list">
+            <datalist id="tag-list">
+                {% for tag in user.tags %}
+                <option value="{{ tag }}">
+                {% endfor %}
+            </datalist>
+        </div>
+        <input type="hidden" id="filter_tags" name="filter_tags" value="{{ ','.join(filter_tag_list) if filter_tag_list else '' }}">
+    </form>
+    
+    {% if filter_tag_list %}
+    <div id="selected-filters" class="link-tags" style="margin-top: 12px;">
+        {% for tag in filter_tag_list %}
+        <span class="tag">
+            {{ tag }}
+            <button type="button" onclick="removeFilterTag('{{ tag }}')" style="background: none; border: none; color: inherit; cursor: pointer; margin-left: 4px;">×</button>
+        </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
 {% if success %}
 <div class="alert alert-success">
     {{ success }}
@@ -34,7 +59,7 @@
         </div>
         
         <div class="link-url">
-            <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ link.url[:80] }}{% if link.url|length > 80 %}...{% endif %}</a>
+            <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ (link.url|clean_url)[:80] }}{% if (link.url|clean_url)|length > 80 %}...{% endif %}</a>
         </div>
         
         {% if link.selected_tags %}
@@ -49,7 +74,7 @@
         {% endif %}
         
         <div class="link-meta">
-            {{ link.submitted_at.strftime('%Y-%m-%d %I:%M %p') }}
+            {{ link.submitted_at.strftime('%Y-%m-%d - %I:%M %p') }}
         </div>
         
         {% if link.error_message %}
@@ -71,7 +96,6 @@
     {% endfor %}
 {% else %}
     <div class="empty-state">
-        <div class="empty-state-icon">📭</div>
         <p>No links submitted yet.</p>
         <p><a href="/submit" class="btn btn-primary" style="margin-top: 16px;">Submit Your First Link</a></p>
     </div>
@@ -80,6 +104,33 @@
 
 {% block extra_scripts %}
 <script>
+    // Multi-tag filter functionality
+    const filterInput = document.getElementById('filter_tag_input');
+    const filterTagsHidden = document.getElementById('filter_tags');
+    const filterForm = document.getElementById('filter-form');
+    let filterTags = filterTagsHidden.value ? filterTagsHidden.value.split(',') : [];
+    
+    if (filterInput) {
+        filterInput.addEventListener('change', function() {
+            const tag = this.value.trim();
+            if (tag && !filterTags.includes(tag)) {
+                filterTags.push(tag);
+                updateFilterTags();
+            }
+            this.value = '';
+        });
+    }
+    
+    function updateFilterTags() {
+        filterTagsHidden.value = filterTags.join(',');
+        filterForm.submit();
+    }
+    
+    function removeFilterTag(tag) {
+        filterTags = filterTags.filter(t => t !== tag);
+        updateFilterTags();
+    }
+    
     // Auto-refresh if there are pending or processing links
     (function() {
         const hasPendingOrProcessing = document.querySelectorAll('.status-pending, .status-processing').length > 0;
