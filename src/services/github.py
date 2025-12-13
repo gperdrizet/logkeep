@@ -1,11 +1,13 @@
 """GitHub repository integration service."""
 import os
+import re
 import tempfile
 import shutil
 from datetime import datetime
 from typing import Tuple, Optional
 from github import Github, GithubException
 from sqlalchemy.orm import Session
+from src.config import settings
 from src.models.link import Link
 from src.models.user import User
 from src.utils.encryption import decrypt_token
@@ -135,7 +137,7 @@ def test_github_connection(user: User) -> Tuple[bool, str]:
         try:
             repo.get_contents("journals")
             journals_exists = True
-        except:
+        except GithubException:
             journals_exists = False
         
         message = f"✓ Connected as {auth_user.login}\n"
@@ -276,7 +278,6 @@ def import_tags_from_journals(user: User, db: Session) -> Tuple[int, Optional[st
     Returns:
         Tuple of (tags_imported_count: int, error_message: Optional[str])
     """
-    import re
     
     try:
         # Decrypt GitHub token
@@ -339,7 +340,7 @@ def import_tags_from_journals(user: User, db: Session) -> Tuple[int, Optional[st
         
         if new_tags:
             max_tags = int(os.getenv("MAX_TAGS_PER_USER", "1000"))
-            available_slots = max_tags - len(user.tags)
+            available_slots = settings.max_tags_per_user - len(user.tags)
             
             if available_slots > 0:
                 tags_to_add = sorted(new_tags)[:available_slots]
@@ -354,8 +355,8 @@ def import_tags_from_journals(user: User, db: Session) -> Tuple[int, Optional[st
                 logger.info(f"Imported {len(tags_to_add)} tags from {file_count} journal files for user {user.username}")
                 return len(tags_to_add), None
             else:
-                logger.warning(f"User {user.username} already has maximum tags ({max_tags})")
-                return 0, f"Tag collection already at maximum ({max_tags})"
+                logger.warning(f"User {user.username} already has maximum tags ({settings.max_tags_per_user})")
+                return 0, f"Tag collection already at maximum ({settings.max_tags_per_user})"
         else:
             # Even if no new tags, update counts for existing tags
             from sqlalchemy.orm.attributes import flag_modified

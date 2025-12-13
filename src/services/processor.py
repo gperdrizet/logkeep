@@ -5,22 +5,26 @@ import trafilatura
 from bs4 import BeautifulSoup
 import requests
 from sqlalchemy.orm import Session
+from src.config import settings
 from src.models.link import Link
 from src.models import LinkStatus
 from src.utils.logging import logger
 
 
-def extract_title_from_url(url: str, timeout: int = 10) -> Optional[str]:
+def extract_title_from_url(url: str, timeout: int = None) -> Optional[str]:
     """
     Extract title from URL using trafilatura with BeautifulSoup fallback.
     
     Args:
         url: URL to extract title from
-        timeout: Request timeout in seconds
+        timeout: Request timeout in seconds (uses config default if None)
         
     Returns:
         Extracted title or None if extraction fails
     """
+    if timeout is None:
+        timeout = settings.request_timeout
+    
     try:
         # Try trafilatura first
         downloaded = trafilatura.fetch_url(url)
@@ -184,15 +188,14 @@ def process_link(link_id: int) -> None:
         else:
             # GitHub commit failed - retry logic
             link.retry_count += 1
-            max_retries = 3
             
-            if link.retry_count < max_retries:
+            if link.retry_count < settings.max_retries:
                 link.status = LinkStatus.PENDING
-                link.error_message = f"Retry {link.retry_count}/{max_retries}: {error}"
-                logger.warning(f"Link {link_id} failed, will retry ({link.retry_count}/{max_retries}): {error}")
+                link.error_message = f"Retry {link.retry_count}/{settings.max_retries}: {error}"
+                logger.warning(f"Link {link_id} failed, will retry ({link.retry_count}/{settings.max_retries}): {error}")
             else:
                 link.status = LinkStatus.FAILED
-                link.error_message = f"Failed after {max_retries} retries: {error}"
+                link.error_message = f"Failed after {settings.max_retries} retries: {error}"
                 logger.error(f"Link {link_id} failed permanently: {error}")
             
             db.commit()
@@ -205,13 +208,13 @@ def process_link(link_id: int) -> None:
             link = db.query(Link).filter(Link.id == link_id).first()
             if link:
                 link.retry_count += 1
-                if link.retry_count < 3:
+                if link.retry_count < settings.max_retries:
                     link.status = LinkStatus.PENDING
                 else:
                     link.status = LinkStatus.FAILED
                 link.error_message = f"Processing error: {str(e)}"
                 db.commit()
-        except:
-            pass
+        except Exception as update_error:
+            logger.error(f"Failed to update link status after error: {str(update_error)}")
     finally:
         db.close()

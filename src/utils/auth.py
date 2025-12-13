@@ -8,18 +8,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+from src.config import settings
 from src.models.user import User
 from src.utils.database import get_db
 
 load_dotenv()
-
-# Security configuration
-SESSION_SECRET = os.getenv("SESSION_SECRET")
-if not SESSION_SECRET:
-    raise ValueError("SESSION_SECRET environment variable not set")
-
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 # HTTP Bearer for optional cookie-based auth
 security = HTTPBearer(auto_error=False)
@@ -53,9 +46,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     if expires_delta:
         expire = datetime.now() + expires_delta
     else:
-        expire = datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now() + timedelta(minutes=settings.access_token_expire_minutes)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SESSION_SECRET, algorithm=ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.session_secret, algorithm=settings.algorithm)
     return encoded_jwt
 
 
@@ -70,7 +63,7 @@ def decode_access_token(token: str) -> Optional[dict]:
         Decoded payload or None if invalid
     """
     try:
-        payload = jwt.decode(token, SESSION_SECRET, algorithms=[ALGORITHM])
+        payload = jwt.decode(token, settings.session_secret, algorithms=[settings.algorithm])
         return payload
     except JWTError:
         return None

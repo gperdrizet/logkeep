@@ -104,7 +104,7 @@ async def submit_link(
     logger.info(f"Link submitted by {current_user.username}: {link.url} (ID: {link.id})")
     
     # Queue background processing
-    background_tasks.add_task(process_link, link.id, db)
+    background_tasks.add_task(process_link, link.id)
     
     return LinkResponse(
         id=link.id,
@@ -257,7 +257,7 @@ async def update_title(
     logger.info(f"Title updated for link {link_id} by {current_user.username}: {link.title}")
     
     # Requeue for processing
-    background_tasks.add_task(process_link, link.id, db)
+    background_tasks.add_task(process_link, link.id)
     
     return LinkResponse(
         id=link.id,

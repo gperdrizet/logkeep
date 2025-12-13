@@ -3,6 +3,7 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from dotenv import load_dotenv
+from src.config import settings
 from src.models import Base
 from src.models.user import User
 from src.models.link import Link
@@ -10,13 +11,10 @@ from src.models.invite import Invite
 
 load_dotenv()
 
-# Get database URL from environment
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data/logkeep.db")
-
 # Create engine
 engine = create_engine(
-    DATABASE_URL,
-    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+    settings.database_url,
+    connect_args={"check_same_thread": False} if settings.database_url.startswith("sqlite") else {},
     echo=False  # Set to True for SQL query logging
 )
 
@@ -27,8 +25,8 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def init_db():
     """Initialize database tables."""
     # Ensure data directory exists for SQLite
-    if DATABASE_URL.startswith("sqlite"):
-        db_path = DATABASE_URL.replace("sqlite:///", "")
+    if settings.database_url.startswith("sqlite"):
+        db_path = settings.database_url.replace("sqlite:///", "")
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
     
     # Create all tables (checkfirst=True is default, but making it explicit)
