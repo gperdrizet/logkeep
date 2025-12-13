@@ -129,9 +129,9 @@ async def index(
     request: Request,
     current_user: Optional[User] = Depends(get_current_user_optional)
 ):
-    """Home page - redirect to dashboard if authenticated, otherwise login."""
+    """Home page - redirect to submit if authenticated, otherwise login."""
     if current_user:
-        return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+        return RedirectResponse(url="/submit", status_code=status.HTTP_302_FOUND)
     return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
 
