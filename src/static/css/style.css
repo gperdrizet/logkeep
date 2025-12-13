@@ -158,7 +158,7 @@ input[type="range"].score-slider {
 input[type="range"].score-slider::-webkit-slider-track {
     width: 100%;
     height: 8px;
-    background: linear-gradient(to right, var(--error-color) 0%, var(--warning-color) 50%, var(--success-color) 100%);
+    background: var(--primary-color);
     border-radius: 4px;
 }
 
@@ -177,7 +177,7 @@ input[type="range"].score-slider::-webkit-slider-thumb {
 input[type="range"].score-slider::-moz-range-track {
     width: 100%;
     height: 8px;
-    background: linear-gradient(to right, var(--error-color) 0%, var(--warning-color) 50%, var(--success-color) 100%);
+    background: var(--primary-color);
     border-radius: 4px;
 }
 
@@ -377,10 +377,6 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
 }
 
 @media (min-width: 768px) {
-    .histogram-container {
-        grid-template-columns: 1fr 1fr;
-    }
-    
     .histogram {
         height: 180px;
     }

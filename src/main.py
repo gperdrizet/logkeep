@@ -279,18 +279,44 @@ async def dashboard(
             bin_index = round(link.score * 10)
             score_bins[bin_index] += 1
     
-    # Calculate histogram data for tag counts
-    tag_count_bins = {}
+    # Calculate histogram data for tag usage frequency
+    # Count how many times each tag appears across all links
+    tag_usage_count = {}
     for link in links:
-        tag_count = len(link.selected_tags)
-        tag_count_bins[tag_count] = tag_count_bins.get(tag_count, 0) + 1
+        for tag in link.selected_tags:
+            tag_usage_count[tag] = tag_usage_count.get(tag, 0) + 1
+    
+    # Bin tags by their frequency of occurrence
+    # Bins: 1, 2-3, 4-6, 7-10, 11-15, 16+
+    frequency_bins = {
+        "1": 0,
+        "2-3": 0,
+        "4-6": 0,
+        "7-10": 0,
+        "11-15": 0,
+        "16+": 0
+    }
+    
+    for count in tag_usage_count.values():
+        if count == 1:
+            frequency_bins["1"] += 1
+        elif 2 <= count <= 3:
+            frequency_bins["2-3"] += 1
+        elif 4 <= count <= 6:
+            frequency_bins["4-6"] += 1
+        elif 7 <= count <= 10:
+            frequency_bins["7-10"] += 1
+        elif 11 <= count <= 15:
+            frequency_bins["11-15"] += 1
+        else:
+            frequency_bins["16+"] += 1
     
     # Prepare data for templates
     score_histogram = [{"bin": i/10, "count": score_bins[i]} for i in range(11)]
-    max_score_count = max(score_bins.values()) if score_bins.values() else 1
+    max_score_count = max(score_bins.values()) if score_bins.values() and max(score_bins.values()) > 0 else 1
     
-    tag_histogram = [{"bin": k, "count": v} for k, v in sorted(tag_count_bins.items())]
-    max_tag_count = max(tag_count_bins.values()) if tag_count_bins.values() else 1
+    tag_histogram = [{"bin": k, "count": v} for k, v in frequency_bins.items()]
+    max_tag_count = max(frequency_bins.values()) if frequency_bins.values() and max(frequency_bins.values()) > 0 else 1
     
     return templates.TemplateResponse(
         "dashboard.html",
@@ -298,6 +324,72 @@ async def dashboard(
             "request": request,
             "user": current_user,
             "links": links,
+            "score_histogram": score_histogram,
+            "max_score_count": max_score_count,
+            "tag_histogram": tag_histogram,
+            "max_tag_count": max_tag_count
+        }
+    )
+
+
+@app.get("/data", response_class=HTMLResponse)
+async def data_page(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Data visualization page."""
+    links = db.query(Link).filter(
+        Link.user_id == current_user.id
+    ).order_by(Link.submitted_at.desc()).limit(50).all()
+    
+    # Calculate histogram data for scores
+    score_bins = {i: 0 for i in range(11)}  # 0.0, 0.1, 0.2, ..., 1.0
+    for link in links:
+        if link.score is not None:
+            bin_index = round(link.score * 10)
+            score_bins[bin_index] += 1
+    
+    # Calculate histogram data for tag usage frequency
+    tag_usage_count = {}
+    for link in links:
+        for tag in link.selected_tags:
+            tag_usage_count[tag] = tag_usage_count.get(tag, 0) + 1
+    
+    frequency_bins = {
+        "1": 0,
+        "2-3": 0,
+        "4-6": 0,
+        "7-10": 0,
+        "11-15": 0,
+        "16+": 0
+    }
+    
+    for count in tag_usage_count.values():
+        if count == 1:
+            frequency_bins["1"] += 1
+        elif 2 <= count <= 3:
+            frequency_bins["2-3"] += 1
+        elif 4 <= count <= 6:
+            frequency_bins["4-6"] += 1
+        elif 7 <= count <= 10:
+            frequency_bins["7-10"] += 1
+        elif 11 <= count <= 15:
+            frequency_bins["11-15"] += 1
+        else:
+            frequency_bins["16+"] += 1
+    
+    score_histogram = [{"bin": i/10, "count": score_bins[i]} for i in range(11)]
+    max_score_count = max(score_bins.values()) if score_bins.values() and max(score_bins.values()) > 0 else 1
+    
+    tag_histogram = [{"bin": k, "count": v} for k, v in frequency_bins.items()]
+    max_tag_count = max(frequency_bins.values()) if frequency_bins.values() and max(frequency_bins.values()) > 0 else 1
+    
+    return templates.TemplateResponse(
+        "data.html",
+        {
+            "request": request,
+            "user": current_user,
             "score_histogram": score_histogram,
             "max_score_count": max_score_count,
             "tag_histogram": tag_histogram,

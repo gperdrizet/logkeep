@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}Submit Link - LogKeep{% endblock %}
+{% block title %}Submit - LogKeep{% endblock %}
 
 {% block content %}
-<h2>Submit Link</h2>
+<h2>Submit</h2>
 
 {% if error %}
 <div class="alert alert-error">
@@ -20,15 +20,13 @@
 <div class="card">
     <form action="/submit" method="post">
         <div class="form-group">
-            <label for="url">URL</label>
+            <label for="url">Link</label>
             <input type="url" id="url" name="url" placeholder="https://example.com/article" required autofocus>
-            <small style="color: #6b7280;">Link will be automatically processed and added to your Logseq journal</small>
         </div>
         
         <div class="form-group">
-            <label for="title">Title (Optional)</label>
+            <label for="title">Title</label>
             <input type="text" id="title" name="title" placeholder="Leave blank for automatic extraction" maxlength="500">
-            <small style="color: #6b7280;">If left blank, we'll try to extract the title automatically</small>
         </div>
         
         <div class="form-group">
@@ -39,10 +37,6 @@
                 <option value="{{ tag }}">
                 {% endfor %}
             </datalist>
-            <small style="color: #6b7280;">
-                Select tags from your collection. 
-                <a href="/tags" style="color: #2563eb;">Manage tags</a>
-            </small>
         </div>
         
         <div id="selected-tags" class="link-tags" style="margin-bottom: 16px;"></div>
@@ -52,10 +46,9 @@
         <div class="form-group">
             <label for="score">Score</label>
             <input type="range" id="score" name="score" min="0" max="1" step="0.1" value="0.5" class="score-slider">
-            <small style="color: #6b7280;">Rate this article (0-1)</small>
         </div>
         
-        <button type="submit" class="btn btn-primary">Submit Link</button>
+        <button type="submit" class="btn btn-primary">Submit</button>
     </form>
 </div>
 
