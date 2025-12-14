@@ -17,7 +17,6 @@ To enable concurrent summarization (when moving from sequential to parallel proc
 4. Increase ThreadPoolExecutor max_workers in main.py startup_event()
 5. Monitor GPU memory usage and adjust max_concurrent_requests accordingly
 """
-import subprocess
 from abc import ABC, abstractmethod
 from typing import Optional, Tuple
 import httpx
@@ -37,12 +36,8 @@ class BaseLLMService(ABC):
             content: The article content to summarize
             title: The article title
             url: The article URL
-            
         Returns:
             Tuple of (success: bool, summary: Optional[str], error: Optional[str])
-            - success: True if summarization succeeded
-            - summary: The generated summary text (max 2000 chars)
-            - error: User-friendly error message if failed
         """
         pass
 
@@ -56,42 +51,21 @@ class OllamaLLMService(BaseLLMService):
         """Ensure only one instance exists (singleton pattern)."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._instance._initialized = False
+            setattr(cls._instance, '_initialized', False)
         return cls._instance
     
     def __init__(self):
         """Initialize the service (only once due to singleton)."""
-        if self._initialized:
+        if getattr(self, '_initialized', False):
             return
-        
         self.client = httpx.Client(timeout=settings.llm_timeout)
         self.base_url = settings.llm_base_url
         self.model_name = settings.llm_model_name
         self.temperature = settings.llm_temperature
         self._initialized = True
-        logger.info(f"OllamaLLMService initialized: {self.base_url}, model={self.model_name}")
+        logger.info("OllamaLLMService initialized: %s, model=%s", self.base_url, self.model_name)
     
-    def _log_gpu_metrics(self, stage: str) -> None:
-        """
-        Log GPU metrics using nvidia-smi.
-        
-        Args:
-            stage: Description of the current stage (e.g., "before_summarization")
-        """
-        try:
-            result = subprocess.run(
-                ['nvidia-smi', '--query-gpu=memory.used,memory.total,temperature.gpu,power.draw', '--format=csv,noheader,nounits'],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if result.returncode == 0:
-                metrics = result.stdout.strip()
-                logger.info(f"GPU metrics ({stage}): {metrics}")
-            else:
-                logger.warning(f"Failed to get GPU metrics ({stage}): {result.stderr}")
-        except Exception as e:
-            logger.warning(f"Error getting GPU metrics ({stage}): {e}")
+
     
     def summarize(self, content: str, title: str, url: str) -> Tuple[bool, Optional[str], Optional[str]]:
         """
@@ -105,16 +79,14 @@ class OllamaLLMService(BaseLLMService):
         Returns:
             Tuple of (success, summary, error)
         """
-        # Log GPU metrics before summarization
-        self._log_gpu_metrics("before_summarization")
-        
         try:
-            # Build the prompt
-            prompt = f"Summarize the following article in 3-5 concise sentences, focusing on key points and main ideas:\n\n{content}"
-            
+            # Improved prompt: explicitly request only summary sentences
+            prompt = (
+                "Write a 3-5 sentence summary of this article. Output only the summary sentences, nothing else:\n\n"
+                f"{content}"
+            )
             # Make request to Ollama API
-            logger.info(f"Requesting summary from Ollama for: {title[:50]}...")
-            
+            logger.info("Requesting summary from Ollama for: %s...", title[:50])
             response = self.client.post(
                 f"{self.base_url}/api/generate",
                 json={
@@ -126,42 +98,50 @@ class OllamaLLMService(BaseLLMService):
                     }
                 }
             )
-            
             response.raise_for_status()
             result = response.json()
-            
             # Extract summary from response
             summary = result.get("response", "").strip()
-            
             if not summary:
                 logger.error("Ollama returned empty summary")
                 return False, None, "Summarization service returned empty result"
-            
+            # Post-process to remove narration lines
+            summary = self._clean_summary(summary)
             # Truncate if needed (should not happen with good prompts)
             if len(summary) > settings.summary_max_length:
-                logger.warning(f"Summary exceeded max length ({len(summary)} > {settings.summary_max_length}), truncating")
+                logger.warning("Summary exceeded max length (%d > %d), truncating", len(summary), settings.summary_max_length)
                 summary = summary[:settings.summary_max_length]
-            
-            # Log GPU metrics after summarization
-            self._log_gpu_metrics("after_summarization")
-            
-            logger.info(f"Summary generated successfully ({len(summary)} chars)")
+            logger.info("Summary generated successfully (%d chars)", len(summary))
             return True, summary, None
-            
         except httpx.TimeoutException:
-            logger.error(f"Timeout while generating summary for: {url}")
-            self._log_gpu_metrics("after_timeout")
+            logger.error("Timeout while generating summary for: %s", url)
             return False, None, "Summarization service unavailable"
-        
         except httpx.HTTPStatusError as e:
-            logger.error(f"HTTP error from Ollama: {e.response.status_code} - {e.response.text}")
-            self._log_gpu_metrics("after_http_error")
+            logger.error("HTTP error from Ollama: %d - %s", e.response.status_code, e.response.text)
             return False, None, "Summarization service unavailable"
-        
         except Exception as e:
-            logger.error(f"Unexpected error during summarization: {e}", exc_info=True)
-            self._log_gpu_metrics("after_error")
+            logger.error("Unexpected error during summarization: %s", e, exc_info=True)
             return False, None, "Content not suitable for summarization"
+
+    def _clean_summary(self, summary: str) -> str:
+        """
+        Remove narration or instruction lines from LLM output, keeping only summary sentences.
+        """
+        import re
+        lines = summary.splitlines()
+        cleaned = []
+        for line in lines:
+            line = line.strip()
+            # Remove lines that look like narration or instructions
+            if not line:
+                continue
+            if re.match(r"^(summary:|here( is| are)? (a|the) summary|in summary|to summarize|the article|this article|overall,|in conclusion|conclusion:|key points:|main points:|highlights:|takeaways:|tl;dr:)", line, re.IGNORECASE):
+                continue
+            # Remove lines that are just markdown bullets or numbers
+            if re.match(r"^[-*\d. ]+$", line):
+                continue
+            cleaned.append(line)
+        return "\n".join(cleaned)
 
 
 def get_llm_service() -> BaseLLMService:

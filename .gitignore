@@ -61,3 +61,7 @@ htmlcov/
 
 # Documentation
 *.md~
+
+# Data
+data
+ollama_models

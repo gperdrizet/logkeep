@@ -43,35 +43,42 @@
 {% if links %}
     {% for link in links %}
     <div class="link-item">
-        <div class="link-header">
-            <div class="link-title">
-                {% if link.title %}
-                    {{ link.title }}
+        <div class="link-title" style="margin-bottom: 0.5em;">
+            {% if link.title %}
+                {{ link.title }}
+            {% else %}
+                <em style="color: #9ca3af;">No title</em>
+            {% endif %}
+        </div>
+        
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
+            {% if link.status.value == 'completed' and (link.summary or link.summary_error or link.has_pending_summary) %}
+            <details style="flex: 1;">
+                <summary style="cursor: pointer;">Summary</summary>
+                {% if link.summary %}
+                <p style="white-space: pre-wrap; margin: 8px 0; line-height: 1.6;">{{ link.summary }}</p>
+                {% elif link.summary_error %}
+                <div class="alert alert-error" style="margin: 8px 0; padding: 8px; font-size: 14px;">{{ link.summary_error }}</div>
                 {% else %}
-                    <em style="color: #9ca3af;">No title</em>
+                <p style="color: #6b7280; font-style: italic; margin: 8px 0;">Pending summary...</p>
                 {% endif %}
-            </div>
+            </details>
+            {% endif %}
+            
+            {% if link.status.value == 'completed' and link.has_pending_summary %}
+            <span class="status-badge status-processing">
+                COMPLETED - SUMMARY PENDING
+            </span>
+            {% else %}
             <span class="status-badge status-{{ link.status.value }}">
                 {{ link.status.value.replace('_', ' ') }}
             </span>
+            {% endif %}
         </div>
         
-        <div class="link-url">
+        <div class="link-url" style="margin-bottom: 1.25em;">
             <a href="{{ link.url }}" target="_blank" rel="noopener noreferrer">{{ (link.url|clean_url)[:80] }}{% if (link.url|clean_url)|length > 80 %}...{% endif %}</a>
         </div>
-        
-        {% if link.status.value == 'completed' and (link.summary or link.summary_error or link.has_pending_summary) %}
-        <details style="margin-top: 12px;">
-            <summary style="cursor: pointer;">View Summary</summary>
-            {% if link.summary %}
-            <p style="white-space: pre-wrap; margin: 8px 0; line-height: 1.6;">{{ link.summary }}</p>
-            {% elif link.summary_error %}
-            <div class="alert alert-error" style="margin: 8px 0; padding: 8px; font-size: 14px;">{{ link.summary_error }}</div>
-            {% else %}
-            <p style="color: #6b7280; font-style: italic; margin: 8px 0;">Pending summary...</p>
-            {% endif %}
-        </details>
-        {% endif %}
         
         {% if link.tags or link.score is not none or link.status.value == 'completed' %}
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
@@ -89,16 +96,12 @@
                     data-title="{{ link.title }}"
                     data-tags='{{ link.tag_names|tojson }}'
                     data-score="{{ link.score if link.score is not none else '' }}"
-                    style="background-color: #3b82f6; color: white; border: none; border-radius: 4px; padding: 6px 16px; font-size: 14px; cursor: pointer; white-space: nowrap; flex-shrink: 0;">
+                    style="background-color: #3b82f6; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 14px; cursor: pointer; white-space: nowrap; flex-shrink: 0;">
                 Edit
             </button>
             {% endif %}
         </div>
         {% endif %}
-        
-        <div class="link-meta">
-            {{ link.submitted_at.strftime('%Y-%m-%d - %I:%M %p') }}
-        </div>
         
         {% if link.error_message %}
         <div class="alert alert-error" style="margin-top: 8px; padding: 8px;">
@@ -259,9 +262,27 @@
     (function() {
         const hasPendingOrProcessing = document.querySelectorAll('.status-pending, .status-processing').length > 0 || {{ any_pending_summaries|lower }};
         
+        // Restore open details after page load
+        const savedOpenDetails = sessionStorage.getItem('openDetails');
+        if (savedOpenDetails) {
+            const indices = JSON.parse(savedOpenDetails);
+            const allDetails = document.querySelectorAll('details');
+            indices.forEach(index => {
+                if (allDetails[index]) {
+                    allDetails[index].open = true;
+                }
+            });
+            sessionStorage.removeItem('openDetails');
+        }
+        
         if (hasPendingOrProcessing) {
-            // Refresh every 5 seconds when there are links being processed or summarized
+            // Save which details elements are open before refresh
             setTimeout(function() {
+                const openDetails = [];
+                document.querySelectorAll('details[open]').forEach((details, index) => {
+                    openDetails.push(index);
+                });
+                sessionStorage.setItem('openDetails', JSON.stringify(openDetails));
                 window.location.reload();
             }, 5000);
         }
