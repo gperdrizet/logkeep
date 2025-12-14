@@ -28,6 +28,9 @@ ENV PATH=/root/.local/bin:$PATH
 # Copy application code
 COPY src/ ./src/
 
+# Copy gunicorn configuration
+COPY gunicorn.conf.py .
+
 # Create necessary directories
 RUN mkdir -p data logs
 
@@ -38,5 +41,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
-# Run application
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run application with Gunicorn
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "src.main:app"]
