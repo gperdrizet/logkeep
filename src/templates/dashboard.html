@@ -54,12 +54,14 @@
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px;">
             {% if link.status.value == 'completed' and (link.summary or link.summary_error or link.has_pending_summary) %}
             <details style="flex: 1;">
-                <summary style="cursor: pointer;">Summary</summary>
                 {% if link.summary %}
+                <summary style="cursor: pointer;">Summary</summary>
                 <p style="white-space: pre-wrap; margin: 8px 0; line-height: 1.6;">{{ link.summary }}</p>
                 {% elif link.summary_error %}
-                <div class="alert alert-error" style="margin: 8px 0; padding: 8px; font-size: 14px;">{{ link.summary_error }}</div>
+                <summary style="cursor: pointer;">Summary unavailable</summary>
+                <div style="background-color: #eff6ff; border-left: 3px solid #3b82f6; margin: 8px 0; padding: 8px; font-size: 14px; color: #1f2937;">{{ link.summary_error }}</div>
                 {% else %}
+                <summary style="cursor: pointer;">Summary</summary>
                 <p style="color: #6b7280; font-style: italic; margin: 8px 0;">Pending summary...</p>
                 {% endif %}
             </details>

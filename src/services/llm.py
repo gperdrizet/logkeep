@@ -135,7 +135,7 @@ class OllamaLLMService(BaseLLMService):
             # Remove lines that look like narration or instructions
             if not line:
                 continue
-            if re.match(r"^(summary:|here( is| are)? (a|the) summary|in summary|to summarize|the article|this article|overall,|in conclusion|conclusion:|key points:|main points:|highlights:|takeaways:|tl;dr:)", line, re.IGNORECASE):
+            if re.match(r"^(summary:|here( is| are)? (a|the|an|\d+) (summary|sentence|key|main)( sentence)?s?:?|in summary|to summarize|the article|this article|overall,|in conclusion|conclusion:|key points:|main points:|highlights:|takeaways:|tl;dr:)", line, re.IGNORECASE):
                 continue
             # Remove lines that are just markdown bullets or numbers
             if re.match(r"^[-*\d. ]+$", line):
