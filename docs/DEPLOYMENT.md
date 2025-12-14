@@ -53,6 +53,8 @@ ssh your-vps-user@your-vps-ip
 sudo bash setup-vps.sh
 ```
 
+**Note:** If you encounter GRUB bootloader errors during setup, see the [GRUB error troubleshooting section](#vps-setup-script-fails-with-grub-error) and use `setup-vps-skip-upgrade.sh` instead.
+
 This script will:
 - Update system packages
 - Install Docker, Docker Compose, Nginx
@@ -201,8 +203,8 @@ docker pull gperdrizet/logkeep:latest
 ### Step 2: start services
 
 ```bash
-# Start all production services
-docker-compose -f docker-compose.prod.yml up -d
+# Start production services (exclude containerized nginx if using system nginx)
+docker-compose -f docker-compose.prod.yml --env-file .env.production up -d postgres app-blue prometheus grafana loki postgres-exporter
 
 # Check status
 docker-compose -f docker-compose.prod.yml ps
@@ -210,6 +212,10 @@ docker-compose -f docker-compose.prod.yml ps
 # View logs
 docker-compose -f docker-compose.prod.yml logs -f
 ```
+
+**Note:** The `--env-file .env.production` flag is required because Docker Compose only auto-loads `.env` by default, not `.env.production`. We exclude the containerized `nginx` service since we're using the system Nginx that's already configured.
+
+**TODO:** We're starting only `app-blue` for initial deployment. The `app-green` container is experiencing health check failures and needs investigation. For now, blue-green deployments are disabled. This should be revisited once the application is stable. See [Issue: Green container health check failures](#green-container-health-check-failures).
 
 ### Step 3: Wait for services to be ready
 
@@ -417,6 +423,97 @@ cd /opt/logkeep
 
 ## Troubleshooting
 
+### Docker Compose not loading .env.production
+
+**Problem:** Docker Compose shows warnings like:
+```
+WARNING: The POSTGRES_PASSWORD variable is not set. Defaulting to a blank string.
+```
+
+And PostgreSQL fails with:
+```
+Error: Database is uninitialized and superuser password is not specified.
+```
+
+**Cause:** Docker Compose only auto-loads a file named `.env` by default, not `.env.production`. The `${VARIABLE}` substitutions in `docker-compose.prod.yml` happen before container startup and need the variables to be available in the shell environment or in `.env`.
+
+**Solution:** Use the `--env-file` flag to explicitly specify the environment file:
+
+```bash
+docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
+docker-compose -f docker-compose.prod.yml --env-file .env.production down
+docker-compose -f docker-compose.prod.yml --env-file .env.production ps
+```
+
+**Alternative solution:** Create a symlink so Docker Compose finds it automatically:
+
+```bash
+ln -sf .env.production .env
+```
+
+### Port 80 already in use (nginx conflict)
+
+**Problem:** Docker Compose fails with:
+```
+failed to bind host port 0.0.0.0:80/tcp: address already in use
+```
+
+**Cause:** System Nginx is already running on port 80. The docker-compose file includes a containerized Nginx, but you're using the system Nginx instead.
+
+**Solution:** Start services without the containerized nginx:
+
+```bash
+docker-compose -f docker-compose.prod.yml --env-file .env.production up -d postgres app-blue prometheus grafana loki postgres-exporter
+```
+
+This uses your existing system Nginx configuration which proxies to the `logkeep-blue` container.
+
+### VPS setup script fails with GRUB error
+
+**Problem:** During `setup-vps.sh` execution, the script fails with:
+```
+Unknown device "/dev/disk/by-id/*": No such file or directory
+dpkg: error processing package grub-efi-amd64-signed (--configure)
+E: Sub-process /usr/bin/dpkg returned an error code (1)
+```
+
+**Cause:** This is a known issue on some VPS environments where the EFI boot configuration doesn't match the actual hardware setup. The GRUB bootloader package attempts to configure devices in `/dev/disk/by-id/` which don't exist in virtualized environments. VPS providers manage the bootloader externally, so GRUB configuration is unnecessary.
+
+**Solution:** Remove the failing GRUB installation scripts and use the skip-upgrade setup script:
+
+```bash
+# On local machine, copy the fix script to VPS
+scp scripts/fix-grub.sh gatekeeper:/tmp/
+
+# On VPS, run the fix script
+bash /tmp/fix-grub.sh
+
+# Then run the skip-upgrade setup script
+sudo bash setup-vps-skip-upgrade.sh
+```
+
+**Manual fix** (if you prefer to run commands individually):
+
+```bash
+# Remove GRUB postinst scripts that cause failures
+sudo rm -f /var/lib/dpkg/info/grub-efi-amd64-signed.postinst
+sudo rm -f /var/lib/dpkg/info/grub-efi-amd64-signed.preinst
+sudo rm -f /var/lib/dpkg/info/grub-efi-amd64-signed.prerm
+sudo rm -f /var/lib/dpkg/info/grub-efi-amd64-signed.postrm
+
+# Create placeholder files so dpkg thinks package is configured
+sudo touch /var/lib/dpkg/info/grub-efi-amd64-signed.list
+sudo touch /var/lib/dpkg/info/grub-efi-amd64-signed.md5sums
+
+# Complete package configuration
+sudo dpkg --configure -a
+
+# Run the skip-upgrade setup script
+sudo bash setup-vps-skip-upgrade.sh
+```
+
+**Note:** The `setup-vps-skip-upgrade.sh` script skips the full system upgrade (`apt upgrade`) and only installs the packages LogKeep needs. This avoids the GRUB issue entirely. The bootloader configuration is not needed for LogKeep operation since all services run in Docker containers and the VPS provider manages system booting.
+
 ### Application won't start
 
 ```bash
@@ -497,6 +594,29 @@ docker exec logkeep-green curl http://localhost:8000/health
 # Manual rollback
 ./scripts/rollback.sh
 ```
+
+### Green container health check failures
+
+**Problem:** The `app-green` container fails health checks during startup with "Container is unhealthy" error.
+
+**Status:** Known issue - currently under investigation. Initial deployment uses only `app-blue` container.
+
+**Temporary workaround:** Start only essential services without green container:
+
+```bash
+docker-compose -f docker-compose.prod.yml --env-file .env.production up -d postgres app-blue prometheus grafana loki postgres-exporter
+```
+
+**Impact:** Blue-green deployment capability is temporarily disabled. Updates must be deployed by restarting `app-blue` container instead of switching traffic between blue and green.
+
+**Investigation needed:**
+1. Check if green container health check endpoint is accessible
+2. Verify green container logs: `docker logs logkeep-green`
+3. Compare blue and green container configurations in `docker-compose.prod.yml`
+4. Test if both containers can run simultaneously without port conflicts
+5. Verify health check timeout and retry settings are appropriate
+
+**TODO:** Re-enable green container once health check issue is resolved. Update deployment scripts to use blue-green switching mechanism.
 
 ---
 
