@@ -47,7 +47,7 @@
             {% if link.title %}
                 {{ link.title }}
             {% else %}
-                <em style="color: #9ca3af;">No title</em>
+                <em style="color: var(--link-url-color);">No title</em>
             {% endif %}
         </div>
         
@@ -59,10 +59,10 @@
                 <p style="white-space: pre-wrap; margin: 8px 0; line-height: 1.6;">{{ link.summary }}</p>
                 {% elif link.summary_error %}
                 <summary style="cursor: pointer;">Summary unavailable</summary>
-                <div style="background-color: #eff6ff; border-left: 3px solid #3b82f6; margin: 8px 0; padding: 8px; font-size: 14px; color: #1f2937;">{{ link.summary_error }}</div>
+                <div style="background-color: var(--input-bg); border-left: 3px solid var(--primary-color); margin: 8px 0; padding: 8px; font-size: 14px; color: var(--text-color);">{{ link.summary_error }}</div>
                 {% else %}
                 <summary style="cursor: pointer;">Summary</summary>
-                <p style="color: #6b7280; font-style: italic; margin: 8px 0;">Pending summary...</p>
+                <p style="color: var(--link-url-color); font-style: italic; margin: 8px 0;">Pending summary...</p>
                 {% endif %}
             </details>
             {% endif %}
@@ -130,10 +130,10 @@
 
 <!-- Edit Link Modal -->
 <div id="edit-modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 2000; overflow-y: auto; padding: 20px;">
-    <div style="max-width: 600px; margin: 40px auto; background: white; border-radius: 8px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+    <div style="max-width: 600px; margin: 40px auto; background: var(--card-bg); border-radius: 8px; padding: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h3 style="margin: 0;">Edit Link</h3>
-            <button onclick="closeEditModal()" style="background: none; border: none; font-size: 28px; cursor: pointer; color: #6b7280; line-height: 1; padding: 0;">&times;</button>
+            <h3 style="margin: 0; color: var(--text-color);">Edit link</h3>
+            <button onclick="closeEditModal()" style="background: none; border: none; font-size: 28px; cursor: pointer; color: var(--link-url-color); line-height: 1; padding: 0;">&times;</button>
         </div>
         
         <form id="edit-form" method="post">
@@ -141,11 +141,10 @@
                 <label for="edit-tags">Tags</label>
                 <div style="position: relative;">
                     <input type="text" id="edit-tags" placeholder="Start typing to add tags..." autocomplete="off">
-                    <div id="edit-tag-suggestions" style="display: none; position: absolute; z-index: 1000; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 2px;"></div>
+                    <div id="edit-tag-suggestions" style="display: none; position: absolute; z-index: 1000; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 4px; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 2px;"></div>
                 </div>
+                <div id="edit-selected-tags" class="link-tags" style="margin-top: 8px;"></div>
             </div>
-            
-            <div id="edit-selected-tags" class="link-tags" style="margin-bottom: 16px;"></div>
             
             <input type="hidden" id="edit-tags-hidden" name="tags_json" value="[]">
             
@@ -160,8 +159,8 @@
             </div>
             
             <div style="display: flex; gap: 12px; margin-top: 24px;">
-                <button type="submit" class="btn btn-primary" style="flex: 1;">Save Changes</button>
-                <button type="button" onclick="closeEditModal()" class="btn" style="flex: 1; background: #e5e7eb;">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Save</button>
+                <button type="button" onclick="deleteLink()" class="btn" style="flex: 1; background: var(--error-color); color: white;">Delete</button>
             </div>
         </form>
     </div>
@@ -339,6 +338,18 @@
         editSelectedTags = [];
     }
     
+    function deleteLink() {
+        if (!currentEditLinkId) return;
+        
+        if (confirm('Are you sure you want to delete this link? This action cannot be undone.')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/links/' + currentEditLinkId + '/delete';
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+    
     // Edit tags autocomplete
     const editTagsInput = document.getElementById('edit-tags');
     const editSuggestionsDiv = document.getElementById('edit-tag-suggestions');
@@ -364,7 +375,7 @@
         
         // Display suggestions
         editSuggestionsDiv.innerHTML = editFilteredTags.map(tag => 
-            `<div class="tag-suggestion" data-tag="${tag}" style="padding: 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0;">${tag}</div>`
+            `<div class="tag-suggestion" data-tag="${tag}">${tag}</div>`
         ).join('');
         editSuggestionsDiv.style.display = 'block';
     });
@@ -419,7 +430,7 @@
             editSelectedTagsDiv.innerHTML = editSelectedTags.map(tag => 
                 `<span class="tag">
                     ${tag}
-                    <button type="button" onclick="removeEditTag('${tag}')" style="background: none; border: none; color: inherit; cursor: pointer; margin-left: 4px; font-size: 18px; line-height: 1;">×</button>
+                    <button type="button" onclick="removeEditTag('${tag}')" class="tag-remove">×</button>
                 </span>`
             ).join('');
         }

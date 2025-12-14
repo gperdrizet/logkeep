@@ -233,3 +233,18 @@ class LinkService:
             List of stale links
         """
         return self.repository.get_stale_processing_links(stale_threshold, max_retries)
+    
+    def delete_link(self, link_id: int, user_id: int) -> None:
+        """
+        Delete a link.
+        
+        Args:
+            link_id: Link ID
+            user_id: User ID (for authorization)
+            
+        Raises:
+            NotFoundError: If link not found
+        """
+        link = self.get_link(link_id, user_id)
+        self.db.delete(link)
+        self.db.commit()

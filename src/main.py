@@ -653,6 +653,55 @@ async def edit_link(
         )
 
 
+@app.post("/links/{link_id}/delete")
+async def delete_link(
+    link_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a link."""
+    from src.services.github import delete_link_from_journal
+    from src.exceptions import NotFoundError
+    
+    try:
+        # Get link using service
+        link_service = LinkService(db)
+        link = link_service.get_link(link_id, current_user.id)
+        
+        # Delete from GitHub only if user has GitHub integration enabled
+        if current_user.github_enabled and current_user.encrypted_github_token:
+            success, error_msg = delete_link_from_journal(link, db)
+            
+            if not success:
+                logger.error(f"Failed to delete link {link_id} from GitHub: {error_msg}")
+                return RedirectResponse(
+                    url=f"/dashboard?error=Failed to delete from GitHub: {error_msg}",
+                    status_code=status.HTTP_302_FOUND
+                )
+        
+        # Delete from database
+        link_service.delete_link(link_id, current_user.id)
+        
+        logger.info(f"Link {link_id} deleted by {current_user.username}")
+        
+        return RedirectResponse(
+            url="/dashboard?success=Link deleted successfully",
+            status_code=status.HTTP_302_FOUND
+        )
+            
+    except NotFoundError:
+        return RedirectResponse(
+            url="/dashboard?error=Link not found",
+            status_code=status.HTTP_302_FOUND
+        )
+    except Exception as e:
+        logger.error(f"Error deleting link {link_id}: {e}")
+        return RedirectResponse(
+            url=f"/dashboard?error=Failed to delete link: {str(e)}",
+            status_code=status.HTTP_302_FOUND
+        )
+
+
 @app.get("/tags", response_class=HTMLResponse)
 async def tags_page(
     request: Request,

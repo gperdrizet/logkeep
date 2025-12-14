@@ -264,7 +264,112 @@ def update_link_in_journal(link: Link, db: Session) -> Tuple[bool, Optional[str]
         return False, error_msg
 
 
-def import_tags_from_journals(user: User, db: Session) -> Tuple[int, Optional[str]]:
+def delete_link_from_journal(link: Link, db: Session) -> Tuple[bool, Optional[str]]:
+    """
+    Delete a link entry from the user's Logseq GitHub repository.
+    
+    Finds and removes the specific link entry from the journal file.
+    
+    Args:
+        link: Link object to delete
+        db: Database session
+        
+    Returns:
+        Tuple of (success: bool, error_message: Optional[str])
+    """
+    import re
+    
+    try:
+        # Get user
+        user = db.query(User).filter(User.id == link.user_id).first()
+        if not user:
+            return False, "User not found"
+        
+        # Decrypt GitHub token
+        try:
+            github_token = decrypt_token(user.encrypted_github_token)
+        except Exception as e:
+            logger.error(f"Failed to decrypt GitHub token for user {user.username}: {str(e)}")
+            return False, "Failed to decrypt GitHub token"
+        
+        # Initialize GitHub client
+        try:
+            g = Github(github_token)
+            repo = g.get_repo(f"{user.repo_owner}/{user.repo_name}")
+        except GithubException as e:
+            if e.status == 401:
+                return False, "GitHub authentication failed - invalid token"
+            elif e.status == 404:
+                return False, f"Repository {user.repo_owner}/{user.repo_name} not found"
+            else:
+                return False, f"GitHub API error: {e.data.get('message', str(e))}"
+        
+        # Get the journal file path for the link's submission date
+        journal_date = link.submitted_at
+        journal_filename = journal_date.strftime("%Y_%m_%d.md")
+        journal_path = f"journals/{journal_filename}"
+        
+        logger.info(f"Deleting link {link.id} from {user.repo_owner}/{user.repo_name}:{journal_path}")
+        
+        # Try to get existing file
+        try:
+            file = repo.get_contents(journal_path)
+            existing_content = file.decoded_content.decode('utf-8')
+        except GithubException as e:
+            if e.status == 404:
+                # File doesn't exist, so link isn't there - consider it success
+                logger.warning(f"Journal file {journal_path} not found - link may not exist in journal")
+                return True, None
+            raise
+        
+        # Find and remove the link entry
+        # Pattern to match the link entry using the URL as unique identifier
+        escaped_url = re.escape(link.url)
+        pattern = rf'^- \[\[.*?\]\] \[link\]\({escaped_url}\).*?$'
+        
+        lines = existing_content.split('\n')
+        found = False
+        updated_lines = []
+        
+        for line in lines:
+            if re.match(pattern, line):
+                found = True
+                logger.info(f"Found and removing line: {line[:100]}...")
+                # Don't add this line to updated_lines (delete it)
+            else:
+                updated_lines.append(line)
+        
+        if not found:
+            # Link entry not found - consider it already deleted
+            logger.warning(f"Could not find link entry in journal file - may already be deleted")
+            return True, None
+        
+        new_content = '\n'.join(updated_lines)
+        
+        # Update file in GitHub
+        commit_message = f"Delete link: {link.title}"
+        repo.update_file(
+            path=journal_path,
+            message=commit_message,
+            content=new_content,
+            sha=file.sha
+        )
+        
+        logger.info(f"Successfully deleted link {link.id} from journal file")
+        return True, None
+        
+    except GithubException as e:
+        error_msg = f"GitHub error: {e.data.get('message', str(e)) if hasattr(e, 'data') else str(e)}"
+        logger.error(f"Failed to delete link {link.id}: {error_msg}")
+        return False, error_msg
+        
+    except Exception as e:
+        error_msg = f"Unexpected error: {str(e)}"
+        logger.error(f"Failed to delete link {link.id}: {error_msg}", exc_info=True)
+        return False, error_msg
+
+
+def import_tags_from_journal(user: User, db: Session) -> Tuple[int, Optional[str]]:
     """
     Import tags from user's existing journal files in GitHub repository.
     
