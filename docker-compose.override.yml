@@ -5,6 +5,10 @@ version: '3.8'
 # For production, rename or delete this file
 
 services:
+  postgres:
+    ports:
+      - "5432:5432"  # Expose PostgreSQL port for development
+
   app:
     volumes:
       - ./src:/app/src:ro

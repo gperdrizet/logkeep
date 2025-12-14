@@ -65,3 +65,5 @@ htmlcov/
 # Data
 data
 ollama_models
+postgres_data/
+secrets/

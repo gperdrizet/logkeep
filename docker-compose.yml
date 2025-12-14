@@ -1,6 +1,35 @@
 version: '3.8'
 
+secrets:
+  postgres_db:
+    file: ./secrets/postgres_db.txt
+  postgres_user:
+    file: ./secrets/postgres_user.txt
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: logkeep-postgres
+    restart: unless-stopped
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB_FILE=/run/secrets/postgres_db
+      - POSTGRES_USER_FILE=/run/secrets/postgres_user
+      - POSTGRES_PASSWORD_FILE=/run/secrets/postgres_password
+    secrets:
+      - postgres_db
+      - postgres_user
+      - postgres_password
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logkeep_user -d logkeep"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   ollama:
     image: ollama/ollama:latest
     container_name: logkeep-ollama
@@ -40,9 +69,13 @@ services:
       - ./logs:/app/logs
     env_file:
       - .env
-    environment:
-      - DATABASE_URL=sqlite:///data/logkeep.db
+    secrets:
+      - postgres_db
+      - postgres_user
+      - postgres_password
     depends_on:
+      postgres:
+        condition: service_healthy
       ollama:
         condition: service_healthy
     healthcheck:
