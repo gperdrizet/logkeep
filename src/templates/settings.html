@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - LogKeep{% endblock %}
+
+{% block content %}
+<div style="max-width: 700px; margin: 20px auto;">
+    <h2>Settings</h2>
+    
+    <div class="card" style="margin-top: 20px;">
+        <h3 class="card-title">GitHub/Logseq Integration</h3>
+        
+        <div id="github-status-message" style="display: none; margin-bottom: 16px;"></div>
+        
+        <form id="github-form">
+            <div class="form-group">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="github_enabled" onchange="toggleGithubFields()" style="margin-right: 8px;">
+                    <span>Enable GitHub/Logseq integration</span>
+                </label>
+                <small style="color: var(--text-muted);">Automatically commit submitted links to your Logseq graph repository</small>
+            </div>
+            
+            <div id="github-fields" style="display: none;">
+                <div class="form-group">
+                    <label for="github_token">GitHub Personal Access Token</label>
+                    <input type="password" id="github_token" placeholder="Enter new token to update">
+                    <small style="color: var(--text-muted);">
+                        <a href="https://github.com/settings/tokens" target="_blank">Generate token</a> with 'repo' scope
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="repo_owner">Repository Owner</label>
+                    <input type="text" id="repo_owner" placeholder="your-username">
+                    <small style="color: var(--text-muted);">Your GitHub username or organization</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="repo_name">Repository Name</label>
+                    <input type="text" id="repo_name" placeholder="my-logseq-graph">
+                    <small style="color: var(--text-muted);">Name of your Logseq graph repository</small>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Save GitHub Settings</button>
+        </form>
+    </div>
+    
+    <div class="card" style="margin-top: 20px;">
+        <h3 class="card-title">Change Password</h3>
+        
+        <div id="password-status-message" style="display: none; margin-bottom: 16px;"></div>
+        
+        <form id="password-form">
+            <div class="form-group">
+                <label for="current_password">Current Password</label>
+                <input type="password" id="current_password" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="new_password">New Password</label>
+                <input type="password" id="new_password" minlength="8" required>
+                <small style="color: var(--text-muted);">Minimum 8 characters</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="confirm_password">Confirm New Password</label>
+                <input type="password" id="confirm_password" minlength="8" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Update Password</button>
+        </form>
+    </div>
+</div>
+
+<script>
+let currentSettings = null;
+
+// Load settings on page load
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadSettings();
+});
+
+async function loadSettings() {
+    try {
+        const response = await fetch('/api/settings');
+        if (!response.ok) throw new Error('Failed to load settings');
+        
+        currentSettings = await response.json();
+        
+        // Update form with current settings
+        document.getElementById('github_enabled').checked = currentSettings.github_enabled;
+        
+        if (currentSettings.github_enabled) {
+            document.getElementById('repo_owner').value = currentSettings.repo_owner || '';
+            document.getElementById('repo_name').value = currentSettings.repo_name || '';
+        }
+        
+        toggleGithubFields();
+    } catch (error) {
+        showGithubMessage('Error loading settings', 'error');
+    }
+}
+
+function toggleGithubFields() {
+    const checkbox = document.getElementById('github_enabled');
+    const fields = document.getElementById('github-fields');
+    
+    if (checkbox.checked) {
+        fields.style.display = 'block';
+    } else {
+        fields.style.display = 'none';
+    }
+}
+
+// Handle GitHub settings form submission
+document.getElementById('github-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const enabled = document.getElementById('github_enabled').checked;
+    const token = document.getElementById('github_token').value;
+    const owner = document.getElementById('repo_owner').value;
+    const name = document.getElementById('repo_name').value;
+    
+    // Validate if enabling
+    if (enabled) {
+        // If previously disabled or if any field changed, require token
+        const needsToken = !currentSettings.github_enabled || 
+                          currentSettings.repo_owner !== owner || 
+                          currentSettings.repo_name !== name ||
+                          token.length > 0;
+        
+        if (needsToken && !token) {
+            showGithubMessage('GitHub token is required when enabling or updating integration', 'error');
+            return;
+        }
+        
+        if (!owner || !name) {
+            showGithubMessage('Repository owner and name are required', 'error');
+            return;
+        }
+    }
+    
+    try {
+        const payload = {
+            github_enabled: enabled,
+            github_token: token || null,
+            repo_owner: owner || null,
+            repo_name: name || null
+        };
+        
+        const response = await fetch('/api/settings/github', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to update settings');
+        }
+        
+        currentSettings = await response.json();
+        showGithubMessage('GitHub settings updated successfully', 'success');
+        
+        // Clear token field after successful update
+        document.getElementById('github_token').value = '';
+    } catch (error) {
+        showGithubMessage(error.message, 'error');
+    }
+});
+
+// Handle password form submission
+document.getElementById('password-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const current = document.getElementById('current_password').value;
+    const newPass = document.getElementById('new_password').value;
+    const confirm = document.getElementById('confirm_password').value;
+    
+    if (newPass !== confirm) {
+        showPasswordMessage('New passwords do not match', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/settings/password', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                current_password: current,
+                new_password: newPass
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to update password');
+        }
+        
+        showPasswordMessage('Password updated successfully', 'success');
+        
+        // Clear form
+        document.getElementById('password-form').reset();
+    } catch (error) {
+        showPasswordMessage(error.message, 'error');
+    }
+});
+
+function showGithubMessage(message, type) {
+    const msgDiv = document.getElementById('github-status-message');
+    msgDiv.textContent = message;
+    msgDiv.className = type === 'success' ? 'alert alert-success' : 'alert alert-error';
+    msgDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        msgDiv.style.display = 'none';
+    }, 5000);
+}
+
+function showPasswordMessage(message, type) {
+    const msgDiv = document.getElementById('password-status-message');
+    msgDiv.textContent = message;
+    msgDiv.className = type === 'success' ? 'alert alert-success' : 'alert alert-error';
+    msgDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        msgDiv.style.display = 'none';
+    }, 5000);
+}
+</script>
+{% endblock %}

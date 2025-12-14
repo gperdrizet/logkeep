@@ -238,19 +238,42 @@ def process_link(link_id: int) -> None:
                 logger.warning(f"Link {link_id} needs manual title")
                 return
         
-        # Title is available (either extracted or provided), proceed to GitHub commit
-        # This will be called from the GitHub service
-        from src.services.github import commit_link_to_github
-        
-        success, error = commit_link_to_github(link, db)
-        
-        if success:
+        # Title is available (either extracted or provided), proceed to GitHub commit if enabled
+        if link.user.github_enabled:
+            from src.services.github import commit_link_to_github
+            
+            success, error = commit_link_to_github(link, db)
+            
+            if success:
+                link.status = LinkStatus.COMPLETED
+                link.processed_at = datetime.now()
+                link.error_message = None
+                db.commit()
+                logger.info(f"Link {link_id} committed to GitHub successfully")
+            else:
+                # GitHub commit failed - retry logic
+                link.retry_count += 1
+                
+                if link.retry_count < settings.max_retries:
+                    link.status = LinkStatus.PENDING
+                    link.error_message = f"Retry {link.retry_count}/{settings.max_retries}: {error}"
+                    logger.warning(f"Link {link_id} failed, will retry ({link.retry_count}/{settings.max_retries}): {error}")
+                else:
+                    link.status = LinkStatus.FAILED
+                    link.error_message = f"Failed after {settings.max_retries} retries: {error}"
+                    logger.error(f"Link {link_id} failed permanently: {error}")
+                
+                db.commit()
+        else:
+            # GitHub not enabled - mark as completed without commit
             link.status = LinkStatus.COMPLETED
             link.processed_at = datetime.now()
             link.error_message = None
             db.commit()
-            logger.info(f"Link {link_id} processed successfully")
-            
+            logger.info(f"Link {link_id} processed successfully (GitHub disabled)")
+        
+        # Only proceed with summarization if link processing succeeded
+        if link.status == LinkStatus.COMPLETED:
             # Attempt summarization if enabled
             # NOTE: This is sequential processing. For concurrent processing:
             # 1. Remove time.sleep delays below
@@ -310,17 +333,6 @@ def process_link(link_id: int) -> None:
                                     link.summary_error = (error_summary or "Summarization failed")[:500]
                                     db.commit()
                                     logger.error(f"Link {link_id} summarization failed after {settings.llm_max_retries} attempts: {error_summary}")
-        else:
-            # GitHub commit failed - retry logic
-            link.retry_count += 1
-            
-            if link.retry_count < settings.max_retries:
-                link.status = LinkStatus.PENDING
-                link.error_message = f"Retry {link.retry_count}/{settings.max_retries}: {error}"
-                logger.warning(f"Link {link_id} failed, will retry ({link.retry_count}/{settings.max_retries}): {error}")
-            else:
-                link.status = LinkStatus.FAILED
-                link.error_message = f"Failed after {settings.max_retries} retries: {error}"
                 logger.error(f"Link {link_id} failed permanently: {error}")
             
             db.commit()

@@ -1,445 +1,193 @@
 # LogKeep
 
-Curate content from links using Logseq & GitHub
+Self-hosted link curation with AI summarization for Logseq
 
 ## Overview
 
-LogKeep is a self-hosted multi-user web service that helps you curate content from links and add them to your Logseq graph stored on GitHub. The primary interface is optimized for smartphone use with minimal typing required.
+LogKeep helps you capture web content from your phone and automatically adds it to your Logseq knowledge graph. Submit a link, select tags, and the system extracts the title, generates an AI summary, and commits a formatted entry to your GitHub-hosted journal. No manual typing of titles or copy-pasting required.
 
 ## Features
 
-- **Mobile-first design** - Large tap targets, minimal typing, optimized for smartphone use
-- **Invite-only system** - Controlled user registration with invite codes
-- **Tag management** - Personal tag collections with autocomplete
-- **Async processing** - Background link processing with automatic title extraction
-- **Auto title extraction** - Automatic content extraction with manual fallback
-- **Secure** - Encrypted GitHub token storage, session-based authentication
-- **Retry logic** - Automatic retry on transient failures (up to 3 attempts)
-- **Status tracking** - Real-time visibility into link processing status
-- **Admin CLI** - Command-line tools for user and system management
+- **Mobile-first UI** - Quick submission, minimal typing
+- **AI summarization** - Optional GPU-accelerated article summaries via Ollama
+- **Async processing** - Background extraction and GitHub commits
+- **Tag management** - Personal collections with autocomplete
+- **Multi-user** - Invite-only with encrypted GitHub token storage
+- **Analytics** - Score and tag usage histograms
+- **Admin CLI** - User, invite, and tag management
 
-## Quick start
+## Quick Start
 
 ### Prerequisites
 
-- Python 3.12+
-- GitHub Personal Access Token with `repo` scope
-- Logseq graph in a GitHub repository
+- Docker & Docker Compose
+- GitHub PAT with `repo` scope
+- Logseq graph in GitHub repo
+- (Optional) NVIDIA GPU + nvidia-container-toolkit for summarization
 
-### Local development
+### Docker Deployment
 
 ```bash
-# Clone repository
+# Clone and configure
 git clone https://github.com/gperdrizet/logkeep.git
 cd logkeep
-
-# Create virtual environment
-python3.12 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create .env file
 cp .env.example .env
 
-# Generate encryption key
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-# Add to .env as ENCRYPTION_KEY
+# Generate secrets
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # ENCRYPTION_KEY
+python -c "import secrets; print(secrets.token_urlsafe(32))"  # SESSION_SECRET
 
-# Generate session secret
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-# Add to .env as SESSION_SECRET
+# Edit .env with secrets and LLM settings (LLM_ENABLED=true for summarization)
+nano .env
 
-# Initialize database
-python -m src.cli.admin init-db
-
-# Create first user
-python -m src.cli.admin create-user
-
-# Generate invite codes
-python -m src.cli.admin create-invite --count 3
-
-# Run development server
-uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Visit `http://localhost:8000` in your browser.
-
-### Docker deployment
-
-```bash
-# Create .env file with production values
-cp .env.example .env
-nano .env  # Edit with your configuration
-
-# Build and start
-docker-compose up -d
-
-# Initialize database (first time only)
-docker-compose exec app python -m src.cli.admin init-db
-
-# Create admin user
-docker-compose exec app python -m src.cli.admin create-user
-
-# Generate invite codes
-docker-compose exec app python -m src.cli.admin create-invite --count 5
-
-# View logs
-docker-compose logs -f app
-```
-
-## Configuration
-
-### Environment variables
-
-Create a `.env` file with:
-
-```bash
-# Session Security (required)
-SESSION_SECRET=your-session-secret-min-32-chars
-
-# Encryption Key (required)
-ENCRYPTION_KEY=your-fernet-key-here
-
-# Database
-DATABASE_URL=sqlite:///data/logkeep.db
-
-# Limits
-MAX_TAGS_PER_USER=1000
-MAX_RETRY_COUNT=3
-
-# Logging
-LOG_LEVEL=INFO
-```
-
-### GitHub setup
-
-Users need a GitHub Personal Access Token:
-
-1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
-2. Click "Generate new token (classic)"
-3. Give it a description: "LogKeep - Logseq Graph Access"
-4. Select scope: **repo** (Full control of private repositories)
-5. Click "Generate token"
-6. Copy token immediately (shown only once)
-7. Provide during user registration or creation
-
-## CLI commands
-
-### Database management
-
-```bash
-# Initialize database
-python -m src.cli.admin init-db
-
-# Generate encryption key
-python -m src.cli.admin generate-key
-```
-
-### User management
-
-```bash
-# Create user
-python -m src.cli.admin create-user
-
-# List all users
-python -m src.cli.admin list-users
-
-# Activate/deactivate user
-python -m src.cli.admin activate-user USERNAME
-python -m src.cli.admin deactivate-user USERNAME
-
-# Test GitHub connection
-python -m src.cli.admin test-github USERNAME
-```
-
-### Invite management
-
-```bash
-# Generate invite codes
-python -m src.cli.admin create-invite --count 5
-
-# List all invites
-python -m src.cli.admin list-invites
-
-# List unused invites only
-python -m src.cli.admin list-invites --unused
-```
-
-### Tag management
-
-```bash
-# Import tags from user's existing journal files
-python -m src.cli.admin import-tags USERNAME
-```
-
-### Debugging
-
-```bash
-# View failed links
-python -m src.cli.admin view-failed-links --username alice --limit 10
-
-# Retry failed links
-python -m src.cli.admin retry-failed alice
-```
-
-## Production deployment (VPS)
-
-### 1. Install Docker
-
-```bash
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo apt install docker-compose
-```
-
-### 2. Setup application
-
-```bash
-# Clone repository
-git clone https://github.com/gperdrizet/logkeep.git
-cd logkeep
-
-# Configure environment
-cp .env.example .env
-nano .env  # Add production secrets
-
-# Start application
+# Start services
 docker-compose up -d
 
 # Initialize
-docker-compose exec app python -m src.cli.admin init-db
-docker-compose exec app python -m src.cli.admin create-user
-docker-compose exec app python -m src.cli.admin create-invite --count 5
+docker exec -it logkeep python -m src.cli.admin init-db
+docker exec -it logkeep python -m src.cli.admin create-user
+docker exec -it logkeep python -m src.cli.admin create-invite --count 5
 ```
 
-### 3. Nginx reverse proxy
+Access at `http://localhost:8000`
 
-Create `/etc/nginx/sites-available/logkeep`:
+### GPU Summarization
 
-```nginx
-server {
-    listen 80;
-    server_name logkeep.example.com;
-
-    location / {
-        proxy_pass http://localhost:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-Enable and reload:
+Requires NVIDIA GPU with drivers and nvidia-container-toolkit:
 
 ```bash
-sudo ln -s /etc/nginx/sites-available/logkeep /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
+# Install nvidia-container-toolkit
+distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
+curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
+  sudo tee /etc/apt/sources.list.d/nvidia-docker.list
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+sudo systemctl restart docker
+
+# Enable in .env
+LLM_ENABLED=true
+LLM_BASE_URL=http://ollama:11434
 ```
 
-### 4. SSL with Certbot
+The Ollama container will download the model (~807MB) on first start.
+
+## Configuration
+
+Key environment variables (`.env`):
 
 ```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d logkeep.example.com
+# Required
+SESSION_SECRET=<32+ chars>
+ENCRYPTION_KEY=<Fernet key>
+
+# LLM (optional)
+LLM_ENABLED=true
+LLM_BASE_URL=http://ollama:11434
+LLM_MODEL_NAME=hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF
+LLM_TIMEOUT=90
+SUMMARIZE_ON_SUBMIT=true
+
+# Limits
+MAX_TAGS_PER_USER=1000
+MAX_RETRIES=3
 ```
 
-### 5. Backup setup
+See `.env.example` for full configuration options.
 
-Create backup script `/usr/local/bin/backup-logkeep.sh`:
+## CLI Commands
+
+All commands run via `docker exec -it logkeep python -m src.cli.admin <command>`:
 
 ```bash
-#!/bin/bash
-BACKUP_DIR="/backups/logkeep"
-mkdir -p $BACKUP_DIR
-cp /path/to/logkeep/data/logkeep.db $BACKUP_DIR/logkeep-$(date +%Y%m%d-%H%M%S).db
-find $BACKUP_DIR -name "logkeep-*.db" -mtime +7 -delete
+# Setup
+init-db                              # Create database schema
+create-user                          # Create user (prompts for GitHub PAT, repo)
+create-invite --count 5              # Generate invite codes
+
+# User management
+list-users                           # Show all users
+activate-user <username>             # Enable user
+deactivate-user <username>           # Disable user
+test-github <username>               # Test GitHub connection
+
+# Summaries
+backfill-summaries <username>        # Generate summaries for existing links
+
+# Debugging
+view-failed-links --username <user>  # Show failed links
+retry-failed <username>              # Retry failed links
+list-invites --unused                # Show available invites
 ```
-
-Add cron job:
-
-```bash
-0 2 * * * /usr/local/bin/backup-logkeep.sh
-```
-
-## User workflow
-
-### 1. Register
-
-- Obtain invite code from admin
-- Visit `/register`
-- Enter username, password, invite code
-- Enter GitHub PAT and repository details
-- System creates account
-
-### 2. Submit links
-
-- Browse content, find interesting article
-- Visit `/submit`
-- Paste URL (autofocus for quick entry)
-- System extracts title automatically
-- Select tags from autocomplete
-- Submit → processed asynchronously
-
-### 3. Monitor status
-
-- Dashboard shows recent 50 submissions
-- Color-coded status: pending, processing, completed, failed
-- View error details for failures
-- Provide title manually if extraction fails
-
-### 4. Manage tags
-
-- Visit `/tags`
-- View current collection
-- Add new tags (up to 100)
-- Remove unused tags
-
-### 5. View in Logseq
-
-- Open Logseq graph
-- Navigate to today's journal
-- See entries at bottom: `- [[Title]] [link](url) #links #tag1 #tag2`
-
-## Logseq entry format
-
-All entries follow this standardized format:
-
-```markdown
-- [[Article Title]] [link](https://example.com/article) #links #research #ai
-```
-
-- `[[Title]]` - Clickable page reference in Logseq
-- `[link](url)` - Original article link
-- `#links` - Required tag (always included)
-- Additional tags from user's selection
-
-Entries are appended to `journals/YYYY_MM_DD.md` in your GitHub repository.
 
 ## Architecture
 
 ```
-┌─────────────┐
-│  Smartphone │
-│   Browser   │
-└──────┬──────┘
-       │ HTTPS
-       ▼
-┌─────────────┐
-│   FastAPI   │
-│   Web App   │
-├─────────────┤
-│  SQLite DB  │
-└──────┬──────┘
-       │
-       ├─► Background Tasks
-       │   (Title Extraction)
-       │
-       └─► GitHub API
-           (Commit Entries)
+┌──────────┐
+│  Mobile  │ → FastAPI (async) → SQLite
+│ Browser  │    ↓         ↓
+└──────────┘    │         └→ BackgroundTasks
+                │              ↓
+                │         Title extraction (trafilatura)
+                │              ↓
+                │         Summarization (Ollama/GPU)
+                │              ↓
+                └────────→ GitHub API commit
 ```
 
-## Security
+**Stack**: FastAPI, SQLAlchemy, SQLite, Jinja2, Ollama, Docker
 
-- **Password Hashing**: Bcrypt with appropriate work factor
-- **Token Encryption**: Fernet (AES-128-CBC) for GitHub PATs at rest
-- **Session Management**: HTTP-only cookies with JWT
-- **HTTPS**: Required in production via reverse proxy
-- **Invite-Only**: Controlled user registration
-- **Database Permissions**: 600 (owner read/write only)
+**Models**: User, Link, Tag, Invite (normalized many-to-many)
 
-## Troubleshooting
+**Processing**: Async background tasks with retry logic, status tracking
 
-### Database issues
+**Security**: Bcrypt passwords, Fernet-encrypted GitHub tokens, JWT sessions
 
-```bash
-# Check database file
-ls -la data/logkeep.db
+## Logseq Entry Format
 
-# Reinitialize (CAUTION: destroys data)
-rm data/logkeep.db
-python -m src.cli.admin init-db
+```markdown
+- [[Article Title]] [link](https://example.com/article) #links #tag1 #tag2 0.8
 ```
 
-### GitHub connection issues
-
-```bash
-# Test connection
-python -m src.cli.admin test-github USERNAME
-
-# Common issues:
-# - Invalid token: Regenerate PAT with 'repo' scope
-# - Repository not found: Check owner/name spelling
-# - No journals/ directory: Will be created on first link
-```
-
-### Processing failures
-
-```bash
-# View failed links
-python -m src.cli.admin view-failed-links --username alice
-
-# Retry failed
-python -m src.cli.admin retry-failed alice
-
-# Check logs
-tail -f logs/app.log
-```
+Entries append to `journals/YYYY_MM_DD.md` with optional score (0.0-1.0).
 
 ## Development
 
-### Project structure
-
-```
-logkeep/
-├── src/
-│   ├── api/          # API endpoints
-│   ├── cli/          # Admin CLI
-│   ├── models/       # Database models
-│   ├── services/     # Business logic
-│   ├── static/       # CSS, JS
-│   ├── templates/    # HTML templates
-│   ├── utils/        # Utilities
-│   └── main.py       # Application entry
-├── data/             # SQLite database
-├── logs/             # Application logs
-├── Dockerfile
-├── docker-compose.yml
-└── requirements.txt
-```
-
-### Running tests
+Live-reload enabled via `docker-compose.override.yml`:
 
 ```bash
-# TODO: Add test suite
-pytest tests/
+# Edit src/ files → uvicorn auto-reloads
+# Edit templates/static → changes immediate
+docker-compose logs -f  # Watch logs
 ```
 
-## Contributing
+Project structure:
+```
+src/
+├── api/          # FastAPI routes
+├── cli/          # Admin commands
+├── models/       # SQLAlchemy models
+├── services/     # Business logic (GitHub, LLM, processing)
+├── templates/    # Jinja2 HTML
+├── static/       # CSS
+└── utils/        # Auth, encryption, database
+```
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+## Troubleshooting
+
+```bash
+# Test GitHub connection
+docker exec -it logkeep python -m src.cli.admin test-github <username>
+
+# View failed links
+docker exec -it logkeep python -m src.cli.admin view-failed-links --username <user>
+
+# Check Ollama status (if enabled)
+docker logs -f logkeep-ollama
+
+# App logs
+docker logs -f logkeep
+```
 
 ## License
 
-MIT License - See LICENSE file for details.
-
-## Support
-
-- Issues: https://github.com/gperdrizet/logkeep/issues
-- Documentation: See PLAN.md for detailed architecture
-
-## Roadmap
-
-- [ ] AI-powered summarization
-- [ ] Automatic tag suggestions
-- [ ] Browser extension
-- [ ] RSS feed integration
-- [ ] Mobile native app
-- [ ] Multi-repository support
+MIT - See LICENSE file

@@ -25,6 +25,7 @@ class UserService:
         username: str,
         password: str,
         invite_code: str,
+        github_enabled: bool = False,
         repo_owner: Optional[str] = None,
         repo_name: Optional[str] = None,
         github_token: Optional[str] = None
@@ -36,6 +37,7 @@ class UserService:
             username: Username
             password: Plain text password
             invite_code: Invite code
+            github_enabled: Whether GitHub integration is enabled
             repo_owner: GitHub repository owner
             repo_name: GitHub repository name
             github_token: Encrypted GitHub token
@@ -75,6 +77,7 @@ class UserService:
         user = User(
             username=username,
             hashed_password=hashed_password,
+            github_enabled=github_enabled,
             repo_owner=repo_owner,
             repo_name=repo_name,
             encrypted_github_token=github_token,

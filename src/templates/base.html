@@ -7,6 +7,13 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>{% block title %}LogKeep{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <script>
+        // Initialize theme before page renders to prevent flash
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -15,7 +22,7 @@
         <div class="container">
             <h1>
                 LogKeep 
-                <span class="repo-info">{{ user.repo_owner }}/{{ user.repo_name }}</span>
+                <span class="repo-info">{{ user.username }}</span>
                 <form action="/logout" method="post" style="display: inline;">
                     <button type="submit" class="logout-link">[logout]</button>
                 </form>
@@ -25,6 +32,10 @@
                 <a href="/submit">Submit</a>
                 <a href="/tags">Tags</a>
                 <a href="/data">Data</a>
+                <a href="/settings">Settings</a>
+                <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode">
+                    <span class="theme-icon">Dark</span>
+                </button>
             </nav>
         </div>
     </header>
@@ -33,6 +44,32 @@
     <main class="container">
         {% block content %}{% endblock %}
     </main>
+    
+    <script>
+        function toggleTheme() {
+            const html = document.documentElement;
+            const currentTheme = html.getAttribute('data-theme') || 'light';
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            // Update button text
+            const icon = document.querySelector('.theme-icon');
+            if (icon) {
+                icon.textContent = newTheme === 'light' ? 'Dark' : 'Light';
+            }
+        }
+        
+        // Set initial button text on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+            const icon = document.querySelector('.theme-icon');
+            if (icon) {
+                icon.textContent = currentTheme === 'light' ? 'Dark' : 'Light';
+            }
+        });
+    </script>
     
     {% block extra_scripts %}{% endblock %}
 </body>

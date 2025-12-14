@@ -1,4 +1,4 @@
-/* Mobile-First Responsive CSS for LogKeep */
+/* Mobile-First Responsive CSS for LogKeep with Dark Mode */
 
 :root {
     --primary-color: #2563eb;
@@ -7,10 +7,41 @@
     --warning-color: #ca8a04;
     --error-color: #dc2626;
     --info-color: #0891b2;
+    
+    /* Light mode (default) */
     --bg-color: #f3f4f6;
     --text-color: #1f2937;
     --border-color: #e5e7eb;
     --input-bg: #f9fafb;
+    --card-bg: #ffffff;
+    --header-bg: #2563eb;
+    --header-text: #ffffff;
+    --link-url-color: #6b7280;
+    --tag-bg: #e0e7ff;
+    --tag-text: #3730a3;
+    --histogram-label-color: #6b7280;
+}
+
+[data-theme="dark"] {
+    --primary-color: #3b82f6;
+    --primary-hover: #2563eb;
+    --success-color: #22c55e;
+    --warning-color: #eab308;
+    --error-color: #ef4444;
+    --info-color: #06b6d4;
+    
+    /* Dark mode */
+    --bg-color: #111827;
+    --text-color: #f3f4f6;
+    --border-color: #374151;
+    --input-bg: #1f2937;
+    --card-bg: #1f2937;
+    --header-bg: #1f2937;
+    --header-text: #f3f4f6;
+    --link-url-color: #9ca3af;
+    --tag-bg: #3730a3;
+    --tag-text: #e0e7ff;
+    --histogram-label-color: #9ca3af;
 }
 
 * {
@@ -27,6 +58,15 @@ body {
     background-color: var(--bg-color);
     padding: 0;
     margin: 0;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+a {
+    color: #2563eb;
+}
+
+[data-theme="dark"] a {
+    color: #60a5fa;
 }
 
 /* Container */
@@ -38,10 +78,11 @@ body {
 
 /* Header */
 header {
-    background-color: var(--primary-color);
-    color: white;
+    background-color: var(--header-bg);
+    color: var(--header-text);
     padding: 8px 16px;
     margin-bottom: 24px;
+    transition: background-color 0.3s ease;
 }
 
 header h1 {
@@ -64,7 +105,7 @@ header h1 .logout-link {
     background: none;
     background-color: transparent;
     border: none;
-    color: white;
+    color: var(--header-text);
     cursor: pointer;
     padding: 0;
     margin: 0;
@@ -85,16 +126,18 @@ header .user-info {
     opacity: 0.9;
 }
 
+/* Dark Mode Toggle */
 /* Navigation */
 nav {
     display: flex;
     gap: 8px;
     margin-top: 12px;
     flex-wrap: wrap;
+    align-items: center;
 }
 
 nav a, nav button {
-    color: white;
+    color: var(--header-text);
     text-decoration: none;
     padding: 8px 16px;
     border-radius: 6px;
@@ -104,6 +147,11 @@ nav a, nav button {
     font-family: inherit;
     font-weight: normal;
     cursor: pointer;
+    display: inline-block;
+    text-align: center;
+    line-height: normal;
+    box-sizing: border-box;
+    vertical-align: middle;
 }
 
 nav a:hover, nav button:hover {
@@ -129,11 +177,13 @@ textarea,
 select {
     width: 100%;
     padding: 14px;
-    font-size: 16px; /* Prevents zoom on iOS */
+    font-size: 16px;
     border: 2px solid var(--border-color);
     border-radius: 8px;
     background-color: var(--input-bg);
-    min-height: 48px; /* Touch target size */
+    color: var(--text-color);
+    min-height: 48px;
+    transition: border-color 0.2s, background-color 0.2s;
 }
 
 input:focus,
@@ -141,7 +191,12 @@ textarea:focus,
 select:focus {
     outline: none;
     border-color: var(--primary-color);
-    background-color: white;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] textarea:focus,
+[data-theme="dark"] select:focus {
+    background-color: #111827;
 }
 
 /* Score Slider (0-1 range) */
@@ -233,10 +288,19 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
 .btn-secondary {
     background-color: #6b7280;
     color: white;
+    transition: background-color 0.2s;
 }
 
 .btn-secondary:hover {
     background-color: #4b5563;
+}
+
+[data-theme="dark"] .btn-secondary {
+    background-color: #4b5563;
+}
+
+[data-theme="dark"] .btn-secondary:hover {
+    background-color: #374151;
 }
 
 .btn-success {
@@ -262,6 +326,7 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
     margin-bottom: 20px;
     border-radius: 8px;
     border-left: 4px solid;
+    transition: background-color 0.3s, color 0.3s;
 }
 
 .alert-success {
@@ -270,10 +335,20 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
     color: #166534;
 }
 
+[data-theme="dark"] .alert-success {
+    background-color: rgba(34, 197, 94, 0.2);
+    color: #86efac;
+}
+
 .alert-error {
     background-color: #fee2e2;
     border-color: var(--error-color);
     color: #991b1b;
+}
+
+[data-theme="dark"] .alert-error {
+    background-color: rgba(239, 68, 68, 0.2);
+    color: #fca5a5;
 }
 
 .alert-warning {
@@ -282,25 +357,37 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
     color: #92400e;
 }
 
+[data-theme="dark"] .alert-warning {
+    background-color: rgba(251, 191, 36, 0.2);
+    color: #fde047;
+}
+
 .alert-info {
     background-color: #cffafe;
     border-color: var(--info-color);
     color: #164e63;
 }
 
+[data-theme="dark"] .alert-info {
+    background-color: rgba(59, 130, 246, 0.2);
+    color: #93c5fd;
+}
+
 /* Cards */
 .card {
-    background-color: white;
+    background-color: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 16px;
+    transition: background-color 0.3s, border-color 0.3s;
 }
 
 .card-title {
     font-size: 18px;
     font-weight: 600;
     margin-bottom: 12px;
+    color: var(--text-color);
 }
 
 /* Histograms */
@@ -312,10 +399,11 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
 }
 
 .histogram-card {
-    background-color: white;
+    background-color: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 16px;
+    transition: background-color 0.3s, border-color 0.3s;
 }
 
 .histogram-title {
@@ -370,7 +458,7 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
 
 .histogram-label {
     font-size: 11px;
-    color: #6b7280;
+    color: var(--histogram-label-color);
     margin-top: 4px;
     text-align: center;
     white-space: nowrap;
@@ -392,11 +480,12 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
 
 /* Link List */
 .link-item {
-    background-color: white;
+    background-color: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 12px;
+    transition: background-color 0.3s, border-color 0.3s;
 }
 
 .link-header {
@@ -414,7 +503,7 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
 }
 
 .link-url {
-    color: #6b7280;
+    color: var(--text-muted);
     font-size: 14px;
     word-break: break-all;
     margin-bottom: 8px;
@@ -434,11 +523,17 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
     padding: 4px 10px;
     border-radius: 12px;
     font-size: 13px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+[data-theme="dark"] .tag {
+    background-color: rgba(99, 102, 241, 0.3);
+    color: #a5b4fc;
 }
 
 .link-meta {
     font-size: 12px;
-    color: #9ca3af;
+    color: var(--text-muted);
     margin-bottom: 8px;
 }
 
@@ -450,6 +545,7 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
+    transition: background-color 0.3s, color 0.3s;
 }
 
 .status-pending {
@@ -457,9 +553,19 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
     color: #1e40af;
 }
 
+[data-theme="dark"] .status-pending {
+    background-color: rgba(59, 130, 246, 0.3);
+    color: #93c5fd;
+}
+
 .status-processing {
     background-color: #fef3c7;
     color: #92400e;
+}
+
+[data-theme="dark"] .status-processing {
+    background-color: rgba(251, 191, 36, 0.3);
+    color: #fde047;
 }
 
 .status-completed {
@@ -467,14 +573,29 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
     color: #166534;
 }
 
+[data-theme="dark"] .status-completed {
+    background-color: rgba(34, 197, 94, 0.3);
+    color: #86efac;
+}
+
 .status-failed {
     background-color: #fee2e2;
     color: #991b1b;
 }
 
+[data-theme="dark"] .status-failed {
+    background-color: rgba(239, 68, 68, 0.3);
+    color: #fca5a5;
+}
+
 .status-needs_title {
     background-color: #fef3c7;
     color: #92400e;
+}
+
+[data-theme="dark"] .status-needs_title {
+    background-color: rgba(251, 191, 36, 0.3);
+    color: #fde047;
 }
 
 /* Tag Manager */
@@ -495,6 +616,12 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
     border-radius: 16px;
     font-size: 14px;
     min-height: 32px; /* Touch target */
+    transition: background-color 0.3s, color 0.3s;
+}
+
+[data-theme="dark"] .tag-item {
+    background-color: rgba(99, 102, 241, 0.3);
+    color: #a5b4fc;
 }
 
 .tag-item button {
@@ -512,7 +639,7 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
 .empty-state {
     text-align: center;
     padding: 40px 20px;
-    color: #9ca3af;
+    color: var(--text-muted);
 }
 
 .empty-state-icon {

@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from src.config import settings
 from src.api import auth, links, tags, health
+from src.api import settings as settings_api
 from src.services.analytics import AnalyticsService
 from src.services.link_service import LinkService
 from src.services.user_service import UserService
@@ -58,6 +59,7 @@ app.include_router(auth.router)
 app.include_router(links.router)
 app.include_router(tags.router)
 app.include_router(health.router)
+app.include_router(settings_api.router)
 
 
 # Startup event - recover stale processing tasks
@@ -209,17 +211,32 @@ async def register_submit(
     username: str = Form(...),
     password: str = Form(...),
     invite_code: str = Form(...),
-    github_token: str = Form(...),
-    repo_owner: str = Form(...),
-    repo_name: str = Form(...),
+    github_enabled: str | None = Form(None),
+    github_token: str | None = Form(None),
+    repo_owner: str | None = Form(None),
+    repo_name: str | None = Form(None),
     db: Session = Depends(get_db)
 ):
     """Handle registration form submission."""
     from src.exceptions import ValidationError, DuplicateError, NotFoundError
     
     try:
-        # Encrypt GitHub token
-        encrypted_token = encrypt_token(github_token)
+        # Check if GitHub is enabled
+        is_github_enabled = github_enabled == "true"
+        
+        # Validate GitHub fields if enabled
+        if is_github_enabled:
+            if not github_token or not repo_owner or not repo_name:
+                return templates.TemplateResponse(
+                    "register.html",
+                    {"request": request, "error": "GitHub token, repository owner, and repository name are required when GitHub integration is enabled"},
+                    status_code=400
+                )
+            encrypted_token = encrypt_token(github_token)
+        else:
+            encrypted_token = None
+            repo_owner = None
+            repo_name = None
         
         # Create user using service
         user_service = UserService(db)
@@ -227,22 +244,24 @@ async def register_submit(
             username=username,
             password=password,
             invite_code=invite_code,
+            github_enabled=is_github_enabled,
             repo_owner=repo_owner,
             repo_name=repo_name,
             github_token=encrypted_token
         )
         
-        logger.info(f"New user registered: {username}")
+        logger.info(f"New user registered: {username} (GitHub enabled: {is_github_enabled})")
         
-        # Import tags from existing journals in background
-        try:
-            from src.services.github import import_tags_from_journals
-            tag_count, tag_error = import_tags_from_journals(user, db)
-            if tag_count > 0:
-                logger.info(f"Auto-imported {tag_count} tags for new user {username}")
-        except Exception as e:
-            # Don't fail registration if tag import fails
-            logger.warning(f"Failed to auto-import tags for {username}: {str(e)}")
+        # Import tags from existing journals in background (only if GitHub enabled)
+        if is_github_enabled:
+            try:
+                from src.services.github import import_tags_from_journals
+                tag_count, tag_error = import_tags_from_journals(user, db)
+                if tag_count > 0:
+                    logger.info(f"Auto-imported {tag_count} tags for new user {username}")
+            except Exception as e:
+                # Don't fail registration if tag import fails
+                logger.warning(f"Failed to auto-import tags for {username}: {str(e)}")
         
         # Redirect to login
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
@@ -408,6 +427,18 @@ async def submit_page(
             "user": current_user,
             "user_tags": sorted(user_tags)
         }
+    )
+
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """Settings page."""
+    return templates.TemplateResponse(
+        "settings.html",
+        {"request": request, "user": current_user}
     )
 
 

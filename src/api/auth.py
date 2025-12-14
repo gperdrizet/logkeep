@@ -25,9 +25,10 @@ class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
     password: str = Field(..., min_length=8, max_length=100)
     invite_code: str = Field(..., min_length=36, max_length=36)
-    github_token: str = Field(..., min_length=10)
-    repo_owner: str = Field(..., min_length=1)
-    repo_name: str = Field(..., min_length=1)
+    github_enabled: bool = Field(default=False)
+    github_token: str | None = Field(default=None)
+    repo_owner: str | None = Field(default=None)
+    repo_name: str | None = Field(default=None)
 
 
 class LoginRequest(BaseModel):
@@ -40,8 +41,9 @@ class UserResponse(BaseModel):
     """User response model."""
     id: int
     username: str
-    repo_owner: str
-    repo_name: str
+    github_enabled: bool
+    repo_owner: str | None = None
+    repo_name: str | None = None
     tag_count: int
 
     class Config:
@@ -88,13 +90,22 @@ async def register(
             detail="Invite code already used"
         )
     
-    # Encrypt GitHub token
-    encrypted_token = encrypt_token(request.github_token)
+    # Validate GitHub fields if GitHub is enabled
+    if request.github_enabled:
+        if not request.github_token or not request.repo_owner or not request.repo_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="GitHub token, repository owner, and repository name are required when GitHub integration is enabled"
+            )
+        encrypted_token = encrypt_token(request.github_token)
+    else:
+        encrypted_token = None
     
     # Create user
     user = User(
         username=request.username,
         hashed_password=get_password_hash(request.password),
+        github_enabled=request.github_enabled,
         encrypted_github_token=encrypted_token,
         repo_owner=request.repo_owner,
         repo_name=request.repo_name,
@@ -112,11 +123,12 @@ async def register(
     db.commit()
     db.refresh(user)
     
-    logger.info(f"New user registered: {user.username}")
+    logger.info(f"New user registered: {user.username} (GitHub enabled: {user.github_enabled})")
     
     return UserResponse(
         id=user.id,
         username=user.username,
+        github_enabled=user.github_enabled,
         repo_owner=user.repo_owner,
         repo_name=user.repo_name,
         tag_count=len(user.tags)
@@ -204,6 +216,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
     return UserResponse(
         id=current_user.id,
         username=current_user.username,
+        github_enabled=current_user.github_enabled,
         repo_owner=current_user.repo_owner,
         repo_name=current_user.repo_name,
         tag_count=len(current_user.tags)

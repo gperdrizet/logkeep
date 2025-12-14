@@ -40,10 +40,7 @@ def init_db_cmd():
 @cli.command('create-user')
 @click.option('--username', prompt=True, help='Username')
 @click.option('--password', prompt=True, hide_input=True, confirmation_prompt=True, help='Password')
-@click.option('--github-token', prompt=True, hide_input=True, help='GitHub Personal Access Token')
-@click.option('--repo-owner', prompt=True, help='GitHub repository owner')
-@click.option('--repo-name', prompt=True, help='GitHub repository name')
-def create_user(username, password, github_token, repo_owner, repo_name):
+def create_user(username, password):
     """Create a new user."""
     db = SessionLocal()
     try:
@@ -57,13 +54,24 @@ def create_user(username, password, github_token, repo_owner, repo_name):
             click.echo(f"✗ User '{username}' already exists", err=True)
             sys.exit(1)
         
-        # Encrypt GitHub token
-        encrypted_token = encrypt_token(github_token)
+        # Ask about GitHub integration
+        github_enabled = click.confirm('Enable GitHub/Logseq integration?', default=False)
+        
+        encrypted_token = None
+        repo_owner = None
+        repo_name = None
+        
+        if github_enabled:
+            github_token = click.prompt('GitHub Personal Access Token', hide_input=True)
+            repo_owner = click.prompt('GitHub repository owner')
+            repo_name = click.prompt('GitHub repository name')
+            encrypted_token = encrypt_token(github_token)
         
         # Create user
         user = User(
             username=username,
             hashed_password=get_password_hash(password),
+            github_enabled=github_enabled,
             encrypted_github_token=encrypted_token,
             repo_owner=repo_owner,
             repo_name=repo_name,
@@ -76,7 +84,10 @@ def create_user(username, password, github_token, repo_owner, repo_name):
         db.refresh(user)
         
         click.echo(f"✓ User created: {username} (ID: {user.id})")
-        click.echo(f"  Repository: {repo_owner}/{repo_name}")
+        if github_enabled:
+            click.echo(f"  Repository: {repo_owner}/{repo_name}")
+        else:
+            click.echo("  GitHub integration: Disabled")
         
     except Exception as e:
         click.echo(f"✗ Error creating user: {str(e)}", err=True)
@@ -127,9 +138,12 @@ def list_users():
         click.echo(f"\nTotal users: {len(users)}\n")
         for user in users:
             status = "✓ Active" if user.is_active else "✗ Inactive"
+            github_status = "✓ Enabled" if user.github_enabled else "✗ Disabled"
             click.echo(f"ID: {user.id}")
             click.echo(f"  Username: {user.username}")
-            click.echo(f"  Repository: {user.repo_owner}/{user.repo_name}")
+            if user.github_enabled:
+                click.echo(f"  Repository: {user.repo_owner}/{user.repo_name}")
+            click.echo(f"  GitHub: {github_status}")
             click.echo(f"  Tags: {len(user.tags)}")
             click.echo(f"  Status: {status}")
             click.echo(f"  Created: {user.created_at.strftime('%Y-%m-%d %I:%M %p')}")
@@ -312,6 +326,10 @@ def test_github(username):
         user = db.query(User).filter(User.username == username).first()
         if not user:
             click.echo(f"✗ User '{username}' not found", err=True)
+            sys.exit(1)
+        
+        if not user.github_enabled:
+            click.echo(f"✗ GitHub integration is not enabled for user '{username}'", err=True)
             sys.exit(1)
         
         click.echo(f"Testing GitHub connection for {username}...\n")

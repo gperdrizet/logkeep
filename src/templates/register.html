@@ -33,26 +33,36 @@
             
             <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e7eb;">
             
-            <h3 style="font-size: 16px; margin-bottom: 16px;">GitHub Configuration</h3>
-            
             <div class="form-group">
-                <label for="github_token">GitHub Personal Access Token</label>
-                <input type="password" id="github_token" name="github_token" required>
-                <small style="color: #6b7280;">
-                    <a href="https://github.com/settings/tokens" target="_blank" style="color: #2563eb;">Generate token</a> with 'repo' scope
-                </small>
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input type="checkbox" id="github_enabled" name="github_enabled" value="true" onchange="toggleGithubFields()" style="margin-right: 8px;">
+                    <span>Enable GitHub/Logseq integration</span>
+                </label>
+                <small style="color: #6b7280;">Optional: Automatically commit links to your Logseq graph repository</small>
             </div>
             
-            <div class="form-group">
-                <label for="repo_owner">Repository Owner</label>
-                <input type="text" id="repo_owner" name="repo_owner" placeholder="your-username" required>
-                <small style="color: #6b7280;">Your GitHub username or organization</small>
-            </div>
-            
-            <div class="form-group">
-                <label for="repo_name">Repository Name</label>
-                <input type="text" id="repo_name" name="repo_name" placeholder="my-logseq-graph" required>
-                <small style="color: #6b7280;">Name of your Logseq graph repository</small>
+            <div id="github-fields" style="display: none;">
+                <h3 style="font-size: 16px; margin: 16px 0;">GitHub Configuration</h3>
+                
+                <div class="form-group">
+                    <label for="github_token">GitHub Personal Access Token</label>
+                    <input type="password" id="github_token" name="github_token">
+                    <small style="color: #6b7280;">
+                        <a href="https://github.com/settings/tokens" target="_blank" style="color: #2563eb;">Generate token</a> with 'repo' scope
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="repo_owner">Repository Owner</label>
+                    <input type="text" id="repo_owner" name="repo_owner" placeholder="your-username">
+                    <small style="color: #6b7280;">Your GitHub username or organization</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="repo_name">Repository Name</label>
+                    <input type="text" id="repo_name" name="repo_name" placeholder="my-logseq-graph">
+                    <small style="color: #6b7280;">Name of your Logseq graph repository</small>
+                </div>
             </div>
             
             <button type="submit" class="btn btn-primary">Create Account</button>
@@ -63,4 +73,26 @@
         </div>
     </div>
 </div>
+
+<script>
+function toggleGithubFields() {
+    const checkbox = document.getElementById('github_enabled');
+    const fields = document.getElementById('github-fields');
+    const githubToken = document.getElementById('github_token');
+    const repoOwner = document.getElementById('repo_owner');
+    const repoName = document.getElementById('repo_name');
+    
+    if (checkbox.checked) {
+        fields.style.display = 'block';
+        githubToken.required = true;
+        repoOwner.required = true;
+        repoName.required = true;
+    } else {
+        fields.style.display = 'none';
+        githubToken.required = false;
+        repoOwner.required = false;
+        repoName.required = false;
+    }
+}
+</script>
 {% endblock %}
