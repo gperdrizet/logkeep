@@ -333,7 +333,6 @@ def process_link(link_id: int) -> None:
                                     link.summary_error = (error_summary or "Summarization failed")[:500]
                                     db.commit()
                                     logger.error(f"Link {link_id} summarization failed after {settings.llm_max_retries} attempts: {error_summary}")
-                logger.error(f"Link {link_id} failed permanently: {error}")
             
             db.commit()
         

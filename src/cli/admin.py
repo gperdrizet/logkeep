@@ -239,6 +239,45 @@ def activate_user(username):
         db.close()
 
 
+@cli.command('delete-user')
+@click.argument('username')
+@click.option('--force', is_flag=True, help='Skip confirmation prompt')
+def delete_user(username, force):
+    """Delete a user account and all associated data."""
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            click.echo(f"✗ User '{username}' not found", err=True)
+            sys.exit(1)
+        
+        # Count associated data
+        link_count = db.query(Link).filter(Link.user_id == user.id).count()
+        
+        # Confirm deletion
+        if not force:
+            click.echo(f"\n⚠ Warning: This will permanently delete:")
+            click.echo(f"  - User: {username}")
+            click.echo(f"  - Links: {link_count}")
+            click.echo(f"  - All associated tags and data")
+            if not click.confirm('\nAre you sure you want to continue?'):
+                click.echo("Deletion cancelled")
+                sys.exit(0)
+        
+        # Delete user (cascade will handle related data)
+        db.delete(user)
+        db.commit()
+        
+        click.echo(f"✓ User '{username}' and all associated data deleted")
+        
+    except Exception as e:
+        click.echo(f"✗ Error deleting user: {str(e)}", err=True)
+        db.rollback()
+        sys.exit(1)
+    finally:
+        db.close()
+
+
 @cli.command('view-failed-links')
 @click.option('--username', help='Filter by username')
 @click.option('--limit', default=10, help='Maximum number of results')

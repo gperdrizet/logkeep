@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 
 from src.config import settings
 from src.api import auth, links, tags, health
-from src.api import settings as settings_api
 from src.services.analytics import AnalyticsService
 from src.services.link_service import LinkService
 from src.services.user_service import UserService
@@ -59,7 +58,6 @@ app.include_router(auth.router)
 app.include_router(links.router)
 app.include_router(tags.router)
 app.include_router(health.router)
-app.include_router(settings_api.router)
 
 
 # Startup event - recover stale processing tasks
@@ -177,8 +175,8 @@ async def login_submit(
         # Create session token
         access_token = create_access_token(data={"sub": str(user.id)})
         
-        # Redirect to dashboard with cookie
-        response = RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
+        # Redirect to submit page with cookie
+        response = RedirectResponse(url="/submit", status_code=status.HTTP_302_FOUND)
         response.set_cookie(
             key="session",
             value=access_token,
@@ -430,16 +428,7 @@ async def submit_page(
     )
 
 
-@app.get("/settings", response_class=HTMLResponse)
-async def settings_page(
-    request: Request,
-    current_user: User = Depends(get_current_user)
-):
-    """Settings page."""
-    return templates.TemplateResponse(
-        "settings.html",
-        {"request": request, "user": current_user}
-    )
+
 
 
 @app.post("/submit")
@@ -690,6 +679,7 @@ async def add_tag(
 ):
     """Add a new tag."""
     from src.exceptions import ValidationError
+    from fastapi.responses import JSONResponse
     
     try:
         tag_service = TagService(db)
@@ -697,9 +687,17 @@ async def add_tag(
         
         logger.info(f"Tag added by {current_user.username}: {tag}")
         
+        # Check if this is an AJAX request
+        if request.headers.get("accept") == "application/json" or request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JSONResponse(content={"success": True, "tag": tag}, status_code=200)
+        
         return RedirectResponse(url="/tags", status_code=status.HTTP_302_FOUND)
         
     except ValidationError as e:
+        # Check if this is an AJAX request
+        if request.headers.get("accept") == "application/json" or request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JSONResponse(content={"success": False, "error": str(e)}, status_code=400)
+        
         # Refresh user to get current tags
         db.refresh(current_user)
         return templates.TemplateResponse(

@@ -28,13 +28,10 @@
             <label for="tags">Tags</label>
             <div style="position: relative;">
                 <input type="text" id="tags" name="tags" placeholder="Start typing to add tags..." autocomplete="off">
-                <div id="tag-suggestions" style="display: none; position: absolute; z-index: 1000; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 2px;"></div>
+                <div id="tag-suggestions" style="display: none; position: absolute; z-index: 1000; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 4px; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 2px;"></div>
             </div>
+            <div id="selected-tags" class="link-tags" style="margin-top: 8px;"></div>
         </div>
-        
-        {% if user_tags %}
-        <div id="selected-tags" class="link-tags" style="margin-bottom: 16px;"></div>
-        {% endif %}
         
         <input type="hidden" id="tags-hidden" name="tags_json" value="[]">
         
@@ -43,7 +40,7 @@
             <input type="range" id="score" name="score" min="0" max="1" step="0.01" value="0.5" class="score-slider">
         </div>
         
-        <button type="submit" class="btn btn-primary">Submit Link</button>
+        <button type="submit" class="btn btn-primary">Submit</button>
     </form>
 </div>
 
@@ -81,7 +78,7 @@
         
         // Display suggestions
         suggestionsDiv.innerHTML = filteredTags.map(tag => 
-            `<div class="tag-suggestion" data-tag="${tag}" style="padding: 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0;">${tag}</div>`
+            `<div class="tag-suggestion" data-tag="${tag}">${tag}</div>`
         ).join('');
         suggestionsDiv.style.display = 'block';
     });
@@ -95,25 +92,37 @@
         }
     });
     
-    // Handle Enter key
+    // Handle Enter key or comma/space separation
     tagsInput.addEventListener('keypress', async function(e) {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
             e.preventDefault();
-            const query = this.value.trim().toLowerCase();
-            
-            if (!query) return;
-            
-            // If there's an exact match or single filtered result, use it
-            if (filteredTags.length === 1) {
-                addTag(filteredTags[0]);
-            } else if (userTags.includes(query) && !selectedTags.includes(query)) {
-                addTag(query);
-            } else if (query) {
-                // Tag doesn't exist - create it automatically
-                await createAndAddTag(query);
-            }
+            await processTagInput();
         }
     });
+    
+    // Process tag input (handles multiple comma or space-separated tags)
+    async function processTagInput() {
+        const input = tagsInput.value.trim();
+        if (!input) return;
+        
+        // Split by commas or spaces, filter out empty strings
+        const tags = input.split(/[,\s]+/).map(t => t.toLowerCase().trim()).filter(t => t);
+        
+        for (const tag of tags) {
+            // If tag exists, add it
+            if (userTags.includes(tag) && !selectedTags.includes(tag)) {
+                addTag(tag);
+            } 
+            // If we have a single filtered result and it's this tag, use it
+            else if (filteredTags.length === 1 && filteredTags[0].toLowerCase() === tag) {
+                addTag(filteredTags[0]);
+            }
+            // Otherwise create it
+            else if (tag) {
+                await createAndAddTag(tag);
+            }
+        }
+    }
     
     // Hide suggestions when clicking outside
     document.addEventListener('click', function(e) {
@@ -130,16 +139,20 @@
             
             const response = await fetch('/tags/add', {
                 method: 'POST',
+                headers: {
+                    'Accept': 'application/json'
+                },
                 body: formData
             });
             
-            if (response.ok) {
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
                 // Successfully created tag - add to local list and selected tags
                 userTags.push(tag);
                 addTag(tag);
             } else {
-                const text = await response.text();
-                alert(`Failed to create tag: ${text}`);
+                alert(`Failed to create tag: ${data.error || 'Unknown error'}`);
             }
         } catch (error) {
             console.error('Error creating tag:', error);
@@ -165,7 +178,7 @@
             selectedTagsDiv.innerHTML = selectedTags.map(tag => 
                 `<span class="tag">
                     ${tag}
-                    <button type="button" onclick="removeTag('${tag}')" style="background: none; border: none; color: inherit; cursor: pointer; margin-left: 4px; font-size: 18px; line-height: 1;">×</button>
+                    <button type="button" onclick="removeTag('${tag}')" class="tag-remove">×</button>
                 </span>`
             ).join('');
         }

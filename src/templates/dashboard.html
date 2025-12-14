@@ -10,7 +10,7 @@
         <div class="form-group" style="margin-bottom: 0;">
             <div style="position: relative;">
                 <input type="text" id="filter_tag_input" placeholder="Add tag to filter..." autocomplete="off">
-                <div id="tag-suggestions" style="display: none; position: absolute; z-index: 1000; background: white; border: 1px solid #ddd; border-radius: 4px; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 2px;"></div>
+                <div id="tag-suggestions" style="display: none; position: absolute; z-index: 1000; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 4px; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 2px;"></div>
             </div>
         </div>
         <input type="hidden" id="filter_tags" name="filter_tags" value="{{ ','.join(filter_tag_list) if filter_tag_list else '' }}">
@@ -21,7 +21,7 @@
         {% for tag in filter_tag_list %}
         <span class="tag">
             {{ tag }}
-            <button type="button" onclick="removeFilterTag('{{ tag }}')" style="background: none; border: none; color: inherit; cursor: pointer; margin-left: 4px; font-size: 18px; line-height: 1;">×</button>
+            <button type="button" onclick="removeFilterTag('{{ tag }}')" class="tag-remove">×</button>
         </span>
         {% endfor %}
     </div>
@@ -86,10 +86,10 @@
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px;">
             <div class="link-tags">
                 {% for tag in link.tags %}
-                <span class="tag">{{ tag.name }}</span>
+                <span class="tag tag-readonly">{{ tag.name }}</span>
                 {% endfor %}
                 {% if link.score is not none %}
-                <span class="tag" style="background-color: #d1d5db; color: #374151;">{{ "%.2f"|format(link.score) }}</span>
+                <span class="tag tag-score">{{ "%.2f"|format(link.score) }}</span>
                 {% endif %}
             </div>
             {% if link.status.value == 'completed' %}
@@ -97,8 +97,7 @@
                     data-link-id="{{ link.id }}"
                     data-title="{{ link.title }}"
                     data-tags='{{ link.tag_names|tojson }}'
-                    data-score="{{ link.score if link.score is not none else '' }}"
-                    style="background-color: #3b82f6; color: white; border: none; border-radius: 6px; padding: 8px 16px; font-size: 14px; cursor: pointer; white-space: nowrap; flex-shrink: 0;">
+                    data-score="{{ link.score if link.score is not none else '' }}">
                 Edit
             </button>
             {% endif %}
@@ -202,7 +201,7 @@
             
             // Display suggestions
             suggestionsDiv.innerHTML = filteredTags.map(tag => 
-                `<div class="tag-suggestion" data-tag="${tag}" style="padding: 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0;">${tag}</div>`
+                `<div class="tag-suggestion" data-tag="${tag}">${tag}</div>`
             ).join('');
             suggestionsDiv.style.display = 'block';
         });

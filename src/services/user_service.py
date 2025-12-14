@@ -58,6 +58,15 @@ class UserService:
         if not password or len(password) < 8:
             raise ValidationError("Password must be at least 8 characters")
         
+        # Truncate password to 72 bytes for bcrypt compatibility
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            # Truncate at byte boundary, then decode safely
+            password = password_bytes[:72].decode('utf-8', errors='ignore').rstrip('\x00')
+            # Ensure the truncated password still meets minimum length
+            if len(password) < 8:
+                raise ValidationError("Password contains characters that cannot be safely truncated")
+        
         # Check for duplicate username
         if self.user_repo.exists_by_username(username):
             raise DuplicateError(f"Username already exists: {username}")
@@ -111,7 +120,7 @@ class UserService:
         if not user:
             raise AuthenticationError("Invalid username or password")
         
-        if not pwd_context.verify(password, user.password_hash):
+        if not pwd_context.verify(password, user.hashed_password):
             raise AuthenticationError("Invalid username or password")
         
         return user
