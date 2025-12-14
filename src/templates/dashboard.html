@@ -202,7 +202,7 @@
             
             // Display suggestions
             suggestionsDiv.innerHTML = filteredTags.map(tag => 
-                `<div class="tag-suggestion" data-tag="${tag}" style="padding: 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0;">#${tag}</div>`
+                `<div class="tag-suggestion" data-tag="${tag}" style="padding: 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0;">${tag}</div>`
             ).join('');
             suggestionsDiv.style.display = 'block';
         });

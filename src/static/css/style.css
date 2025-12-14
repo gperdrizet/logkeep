@@ -7,7 +7,7 @@
     --warning-color: #ca8a04;
     --error-color: #dc2626;
     --info-color: #0891b2;
-    --bg-color: #ffffff;
+    --bg-color: #f3f4f6;
     --text-color: #1f2937;
     --border-color: #e5e7eb;
     --input-bg: #f9fafb;
@@ -40,7 +40,7 @@ body {
 header {
     background-color: var(--primary-color);
     color: white;
-    padding: 16px;
+    padding: 8px 16px;
     margin-bottom: 24px;
 }
 
@@ -488,23 +488,24 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
 .tag-item {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     background-color: #e0e7ff;
     color: #3730a3;
-    padding: 8px 12px;
-    border-radius: 20px;
-    min-height: 44px; /* Touch target */
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 14px;
+    min-height: 32px; /* Touch target */
 }
 
 .tag-item button {
     background: none;
     border: none;
     color: #3730a3;
-    font-size: 18px;
+    font-size: 16px;
     cursor: pointer;
     padding: 0;
-    min-height: 32px;
-    min-width: 32px;
+    min-height: 28px;
+    min-width: 28px;
 }
 
 /* Empty State */
@@ -567,8 +568,7 @@ input[type="range"].score-slider:focus::-moz-range-thumb {
     }
     
     header {
-        padding: 24px;
-        border-radius: 8px;
+        padding: 12px 24px;
     }
     
     .btn {
