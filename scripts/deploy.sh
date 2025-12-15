@@ -101,9 +101,10 @@ wait_for_health() {
 switch_nginx_via_symlink() {
     local new_slot=$1
     local old_slot=$2
+    local nginx_configs_dir="/etc/nginx/logkeep-configs"
     local nginx_conf_dir="/etc/nginx/conf.d"
     local symlink_path="${nginx_conf_dir}/logkeep.conf"
-    local new_config="${nginx_conf_dir}/${new_slot}.conf"
+    local new_config="${nginx_configs_dir}/${new_slot}.conf"
     
     log_step "Switching nginx to $new_slot via symlink..."
     
@@ -120,7 +121,7 @@ switch_nginx_via_symlink() {
     if ! sudo nginx -t 2>/dev/null; then
         log_error "Nginx configuration test failed!"
         # Attempt to rollback
-        sudo ln -sf "${nginx_conf_dir}/${old_slot}.conf" "$symlink_path"
+        sudo ln -sf "${nginx_configs_dir}/${old_slot}.conf" "$symlink_path"
         return 1
     fi
     
@@ -172,9 +173,9 @@ preflight_checks() {
         exit 1
     fi
     
-    # Verify nginx config files exist in system directory
-    if [ ! -f "/etc/nginx/conf.d/blue.conf" ] || [ ! -f "/etc/nginx/conf.d/green.conf" ]; then
-        log_error "Nginx blue/green config files not found in /etc/nginx/conf.d/"
+    # Verify nginx config files exist in logkeep-configs directory
+    if [ ! -f "/etc/nginx/logkeep-configs/blue.conf" ] || [ ! -f "/etc/nginx/logkeep-configs/green.conf" ]; then
+        log_error "Nginx blue/green config files not found in /etc/nginx/logkeep-configs/"
         exit 1
     fi
     
