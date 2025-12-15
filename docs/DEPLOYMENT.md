@@ -368,13 +368,19 @@ Go to GitHub repository → Settings → Secrets and Variables → Actions
 
 Add these secrets:
 
-| Secret Name | Value |
-|-------------|-------|
-| `DOCKER_HUB_USERNAME` | gperdrizet |
-| `DOCKER_HUB_TOKEN` | (generate at hub.docker.com) |
-| `VPS_SSH_PRIVATE_KEY` | (your SSH private key) |
-| `VPS_HOST` | (your VPS IP) |
-| `VPS_USER` | siderealyear |
+| Secret Name | Value | Notes |
+|-------------|-------|-------|
+| `DOCKER_HUB_USERNAME` | gperdrizet | Docker Hub username |
+| `DOCKER_HUB_TOKEN` | (generate at hub.docker.com) | Docker Hub access token |
+| `VPS_SSH_PRIVATE_KEY` | (your SSH private key) | **Must be OpenSSH format** (starts with `-----BEGIN OPENSSH PRIVATE KEY-----`) |
+| `VPS_HOST` | 74.208.107.78 | **Use IP address, not SSH alias** |
+| `VPS_USER` | siderealyear | VPS username with deploy permissions |
+
+**Important Notes:**
+- SSH private key must be in OpenSSH format. Generate with: `ssh-keygen -t rsa -b 4096`
+- VPS_HOST must be the IP address - SSH aliases from `~/.ssh/config` won't work in GitHub Actions
+- VPS user must have passwordless SSH key authentication configured
+- VPS SSH runs on port 44441 (configured in workflow, not in secrets)
 
 ### Step 2: create github environments
 
@@ -859,6 +865,71 @@ curl -I https://logkeep.perdrizet.org/static/css/style.css
 2. Consider adding node-exporter for system metrics
 3. Update dashboard queries to match actual available metrics
 4. Test and validate all panels display data correctly
+
+### CI/CD pipeline configuration
+
+**Problem:** GitHub Actions workflows failed with multiple configuration issues during initial setup.
+
+**Status:** ✅ RESOLVED
+
+**Issues Encountered and Resolved:**
+
+1. **Invalid Docker Tag Format**
+   - **Error:** `invalid tag "***/logkeep:-c646840": invalid reference format`
+   - **Cause:** Metadata action used `type=sha,prefix={{branch}}-` which evaluated to empty prefix for pull requests
+   - **Fix:** Changed to `type=sha` without branch prefix in `.github/workflows/build-and-push.yml`
+
+2. **SSH Private Key Format Error**
+   - **Error:** `Error loading key "(stdin)": error in libcrypto`
+   - **Cause:** SSH private key secret had incorrect format or encoding
+   - **Fix:** Updated `VPS_SSH_PRIVATE_KEY` secret with proper OpenSSH format key using `gh secret set`
+
+3. **SSH Connection Refused**
+   - **Error:** `ssh: connect to host *** port 22: Connection refused`
+   - **Cause:** VPS SSH runs on custom port 44441, not default port 22
+   - **Fix:** Added SSH config in workflow to specify port 44441:
+     ```yaml
+     echo "Host ${{ secrets.VPS_HOST }}" >> ~/.ssh/config
+     echo "  Port 44441" >> ~/.ssh/config
+     ```
+
+4. **VPS Host Resolution**
+   - **Error:** `ssh-keyscan` failed to reach VPS
+   - **Cause:** `VPS_HOST` secret contained SSH alias `gatekeeper` instead of IP
+   - **Fix:** Updated `VPS_HOST` secret to actual IP address `74.208.107.78`
+
+5. **Nginx Check Failure**
+   - **Error:** `Nginx is not installed` during preflight checks
+   - **Cause:** Deploy script used `sudo nginx -v` which requires interactive sudo password
+   - **Fix:** Changed to `command -v nginx` with warning instead of error in `scripts/deploy.sh`
+
+6. **Nginx Configuration Mismatch**
+   - **Error:** Deploy script tried to update Docker container names, but nginx uses localhost ports
+   - **Cause:** Script expected `server logkeep-blue:8000` but actual config uses `server 127.0.0.1:8001`
+   - **Fix:** Updated `switch_nginx_upstream()` function to use port numbers (8001/8002) instead of container names
+
+7. **Passwordless Sudo Required**
+   - **Issue:** Deploy script needs to reload nginx without password prompt
+   - **Fix:** Added sudoers file on VPS:
+     ```bash
+     # /etc/sudoers.d/logkeep-deploy
+     siderealyear ALL=(ALL) NOPASSWD: /usr/bin/nginx, /usr/sbin/nginx, /bin/systemctl reload nginx, /usr/bin/systemctl reload nginx, /bin/sed
+     ```
+
+**Current State:**
+- Build workflow successfully builds and pushes Docker images on dev and main branches
+- Build workflow runs on pull requests for validation
+- Production deployment workflow configured for main branch merges
+- Staging workflow disabled (manual-only) until staging environment configured
+- SSH authentication working with correct port and credentials
+- Deploy script compatible with VPS nginx configuration
+
+**Files Modified:**
+- `.github/workflows/build-and-push.yml` - Fixed tag generation
+- `.github/workflows/deploy-production.yml` - Added SSH port config
+- `.github/workflows/deploy-staging.yml` - Changed to manual-only
+- `scripts/deploy.sh` - Fixed nginx checks and port-based switching
+- VPS: `/etc/sudoers.d/logkeep-deploy` - Passwordless sudo for deployment
 
 ### Staging environment not configured
 
