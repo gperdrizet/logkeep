@@ -91,3 +91,8 @@ def get_db() -> Session:
         yield db
     finally:
         db.close()
+
+
+if __name__ == "__main__":
+    """Run database initialization when called as a module."""
+    init_db()
