@@ -1,9 +1,6 @@
 name: Deploy to Staging
 
 on:
-  push:
-    branches:
-      - dev
   workflow_dispatch:
     inputs:
       image_tag:
