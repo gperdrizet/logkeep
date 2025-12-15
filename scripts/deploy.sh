@@ -24,7 +24,7 @@ IMAGE_TAG="${1:-latest}"
 IMAGE_NAME="gperdrizet/logkeep:${IMAGE_TAG}"
 HEALTH_CHECK_RETRIES=15
 HEALTH_CHECK_INTERVAL=10
-OBSERVATION_PERIOD=300  # 5 minutes in seconds
+OBSERVATION_PERIOD="${OBSERVATION_PERIOD:-300}"  # Default: 5 minutes, can be overridden with env var
 
 # =============================================================================
 # Helper Functions

@@ -54,8 +54,8 @@ jobs:
             
             echo "Starting deployment of $IMAGE_TAG..."
             
-            # Run deployment script
-            ./scripts/deploy.sh $IMAGE_TAG
+            # Run deployment script with shorter observation for CI/CD
+            OBSERVATION_PERIOD=60 ./scripts/deploy.sh $IMAGE_TAG
             
             echo "Deployment completed!"
           EOF
