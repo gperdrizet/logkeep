@@ -116,9 +116,14 @@ switch_nginx_via_symlink() {
     local new_config="${nginx_configs_dir}/${new_slot}.conf"
     
     log_step "Switching nginx to $new_slot via symlink..."
+    log_info "Creating symlink: $symlink_path -> $new_config"
     
     # Update symlink on system to point to new config
     sudo ln -sf "$new_config" "$symlink_path"
+    
+    # Force filesystem sync
+    sync
+    sleep 0.5
     
     # Verify symlink was created correctly
     local current_link=$(sudo readlink "$symlink_path")
@@ -126,6 +131,7 @@ switch_nginx_via_symlink() {
         log_error "Failed to create symlink (points to: $current_link, expected: $new_config)"
         return 1
     fi
+    log_info "Symlink verified: $(sudo ls -l $symlink_path)"
     
     # Test nginx configuration
     if ! sudo nginx -t 2>&1 | tee /tmp/nginx-test.log | grep -q "test is successful"; then
