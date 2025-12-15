@@ -101,21 +101,21 @@ wait_for_health() {
 
 switch_nginx_upstream() {
     local new_slot=$1
-    local new_container="logkeep-${new_slot}"
+    local new_port=$(get_container_port "$new_slot")
     
-    log_step "Switching Nginx upstream to $new_slot..."
+    log_step "Switching Nginx upstream to $new_slot (port $new_port)..."
     
-    # Update Nginx config to point to new container
-    sudo sed -i "s/server logkeep-[a-z]*:8000;/server ${new_container}:8000;/" "$NGINX_CONF"
+    # Update Nginx config to point to new port
+    sudo sed -i "s/server 127.0.0.1:[0-9]*;/server 127.0.0.1:${new_port};/" "$NGINX_CONF"
     
     # Test configuration
-    if ! sudo nginx -t; then
+    if ! sudo nginx -t 2>/dev/null; then
         log_error "Nginx configuration test failed!"
         return 1
     fi
     
     # Reload Nginx
-    sudo nginx -s reload
+    sudo systemctl reload nginx
     log_info "Nginx reloaded successfully"
 }
 
@@ -155,10 +155,9 @@ preflight_checks() {
         exit 1
     fi
     
-    # Check Nginx
-    if ! sudo nginx -v > /dev/null 2>&1; then
-        log_error "Nginx is not installed"
-        exit 1
+    # Check Nginx (optional - warn if not available)
+    if ! command -v nginx > /dev/null 2>&1; then
+        log_warn "Nginx command not found in PATH, but may still be installed"
     fi
     
     log_info "Preflight checks passed"
