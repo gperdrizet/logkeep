@@ -195,6 +195,26 @@ sudo journalctl -u logkeep-tunnel -f
 ssh gatekeeper "curl -s http://localhost:11434/api/tags"
 ```
 
+### Step 4: configure docker container to access tunnel
+
+**Important:** Docker containers cannot reach `localhost:11434` because from inside a container, `localhost` refers to the container itself, not the VPS host. The SSH tunnel endpoint on the VPS host must be accessed via Docker's bridge gateway IP.
+
+Update `.env.production` on the VPS to use Docker's default bridge gateway:
+
+```bash
+# On VPS
+cd /opt/logkeep
+sudo nano .env.production
+
+# Change LLM_BASE_URL from:
+LLM_BASE_URL=http://localhost:11434
+
+# To:
+LLM_BASE_URL=http://172.17.0.1:11434
+```
+
+The IP `172.17.0.1` is Docker's default bridge network gateway, which allows containers to reach services on the host machine. This lets the LogKeep container connect to the SSH tunnel endpoint.
+
 ---
 
 ## Application deployment
@@ -693,6 +713,32 @@ docker-compose -f docker-compose.prod.yml --env-file .env.production up -d postg
 7. Check FastAPI/Starlette static file configuration
 
 **TODO:** Debug and fix static file serving to restore application styling.
+
+### Docker Compose log streaming error
+
+**Problem:** When following container logs with `-f` flag, you may see:
+
+```
+Exception in thread Thread-2 (watch_events):
+Traceback (most recent call last):
+  File "/usr/lib/python3.10/threading.py", line 1016, in _bootstrap_inner
+    self.run()
+  File "/usr/lib/python3.10/threading.py", line 953, in run
+    self._target(*self._args, **self._kwargs)
+  File "/usr/lib/python3/dist-packages/compose/cli/log_printer.py", line 202, in watch_events
+    for event in event_stream:
+  File "/usr/lib/python3/dist-packages/compose/project.py", line 626, in yield_loop
+    yield build_container_event(event)
+  File "/usr/lib/python3/dist-packages/compose/project.py", line 594, in build_container_event
+    container = Container.from_id(self.client, event['id'])
+KeyError: 'id'
+```
+
+**Cause:** This is a known bug in docker-compose's log streaming thread. It occurs when the event stream encounters a malformed event.
+
+**Impact:** None - this is purely a cosmetic issue in the log watching thread. It does not affect container operation, log collection, or application functionality.
+
+**Solution:** This error can be safely ignored. If it bothers you, use `--tail` without `-f` for non-streaming logs, or use `docker logs` directly instead of `docker-compose logs`.
 
 ---
 
