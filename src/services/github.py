@@ -140,9 +140,9 @@ def test_github_connection(user: User) -> Tuple[bool, str]:
         except GithubException:
             journals_exists = False
         
-        message = f"✓ Connected as {auth_user.login}\n"
-        message += f"✓ Repository {user.repo_owner}/{user.repo_name} accessible\n"
-        message += f"✓ journals/ directory: {'exists' if journals_exists else 'will be created on first link'}"
+        message = f"[OK] Connected as {auth_user.login}\n"
+        message += f"[OK] Repository {user.repo_owner}/{user.repo_name} accessible\n"
+        message += f"[OK] journals/ directory: {'exists' if journals_exists else 'will be created on first link'}"
         
         return True, message
         

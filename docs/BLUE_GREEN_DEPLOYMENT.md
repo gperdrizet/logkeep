@@ -10,22 +10,22 @@ After evaluating multiple approaches, we implemented **system nginx with symlink
 
 ### Approaches Evaluated
 
-1. **sed-based config editing** ❌
+1. **sed-based config editing** [FAIL]
    - Fragile string replacement
    - Prone to errors
    - Difficult to maintain
 
-2. **Traefik with Docker labels** ❌
+2. **Traefik with Docker labels** [FAIL]
    - Problem: Docker doesn't support runtime label changes
    - Requires container recreation even with `docker update --label-add`
    - Added complexity without benefits
 
-3. **Containerized nginx with symlinks** ❌
+3. **Containerized nginx with symlinks** [FAIL]
    - Problem: Docker bind mounts resolve symlinks at **container creation time**
    - Changing symlink requires container recreation (~3-5s)
    - Defeats the purpose of fast switching
 
-4. **System nginx with symlinks** ✅ **FINAL SOLUTION**
+4. **System nginx with symlinks** [OK] **FINAL SOLUTION**
    - Nginx runs directly on host system
    - Symlinks resolved at runtime by nginx process
    - `systemctl reload nginx` picks up changes instantly (~100ms)

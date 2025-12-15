@@ -31,9 +31,9 @@ def init_db_cmd():
     """Initialize database tables."""
     try:
         init_db()
-        click.echo("✓ Database initialized successfully")
+        click.echo("[OK] Database initialized successfully")
     except Exception as e:
-        click.echo(f"✗ Error initializing database: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error initializing database: {str(e)}", err=True)
         sys.exit(1)
 
 
@@ -46,12 +46,12 @@ def create_user(username, password):
     try:
         # Validate password length (bcrypt limit is 72 bytes)
         if len(password.encode('utf-8')) > 72:
-            click.echo("⚠ Warning: Password longer than 72 bytes will be truncated", err=True)
+            click.echo("[WARN] Warning: Password longer than 72 bytes will be truncated", err=True)
         
         # Check if username exists
         existing = db.query(User).filter(User.username == username).first()
         if existing:
-            click.echo(f"✗ User '{username}' already exists", err=True)
+            click.echo(f"[FAIL] User '{username}' already exists", err=True)
             sys.exit(1)
         
         # Ask about GitHub integration
@@ -83,14 +83,14 @@ def create_user(username, password):
         db.commit()
         db.refresh(user)
         
-        click.echo(f"✓ User created: {username} (ID: {user.id})")
+        click.echo(f"[OK] User created: {username} (ID: {user.id})")
         if github_enabled:
             click.echo(f"  Repository: {repo_owner}/{repo_name}")
         else:
             click.echo("  GitHub integration: Disabled")
         
     except Exception as e:
-        click.echo(f"✗ Error creating user: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error creating user: {str(e)}", err=True)
         db.rollback()
         sys.exit(1)
     finally:
@@ -112,12 +112,12 @@ def create_invite(count):
         
         db.commit()
         
-        click.echo(f"✓ Generated {count} invite code(s):")
+        click.echo(f"[OK] Generated {count} invite code(s):")
         for code in codes:
             click.echo(f"  {code}")
         
     except Exception as e:
-        click.echo(f"✗ Error creating invites: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error creating invites: {str(e)}", err=True)
         db.rollback()
         sys.exit(1)
     finally:
@@ -137,8 +137,8 @@ def list_users():
         
         click.echo(f"\nTotal users: {len(users)}\n")
         for user in users:
-            status = "✓ Active" if user.is_active else "✗ Inactive"
-            github_status = "✓ Enabled" if user.github_enabled else "✗ Disabled"
+            status = "[OK] Active" if user.is_active else "[FAIL] Inactive"
+            github_status = "[OK] Enabled" if user.github_enabled else "[FAIL] Disabled"
             click.echo(f"ID: {user.id}")
             click.echo(f"  Username: {user.username}")
             if user.github_enabled:
@@ -150,7 +150,7 @@ def list_users():
             click.echo()
         
     except Exception as e:
-        click.echo(f"✗ Error listing users: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error listing users: {str(e)}", err=True)
         sys.exit(1)
     finally:
         db.close()
@@ -174,7 +174,7 @@ def list_invites(unused):
         
         click.echo(f"\nTotal invites: {len(invites)}\n")
         for invite in invites:
-            status = "✓ Unused" if not invite.is_used else "✗ Used"
+            status = "[OK] Unused" if not invite.is_used else "[FAIL] Used"
             click.echo(f"Code: {invite.code}")
             click.echo(f"  Status: {status}")
             click.echo(f"  Created: {invite.created_at.strftime('%Y-%m-%d %I:%M %p')}")
@@ -185,7 +185,7 @@ def list_invites(unused):
             click.echo()
         
     except Exception as e:
-        click.echo(f"✗ Error listing invites: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error listing invites: {str(e)}", err=True)
         sys.exit(1)
     finally:
         db.close()
@@ -199,16 +199,16 @@ def deactivate_user(username):
     try:
         user = db.query(User).filter(User.username == username).first()
         if not user:
-            click.echo(f"✗ User '{username}' not found", err=True)
+            click.echo(f"[FAIL] User '{username}' not found", err=True)
             sys.exit(1)
         
         user.is_active = False
         db.commit()
         
-        click.echo(f"✓ User '{username}' deactivated")
+        click.echo(f"[OK] User '{username}' deactivated")
         
     except Exception as e:
-        click.echo(f"✗ Error deactivating user: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error deactivating user: {str(e)}", err=True)
         db.rollback()
         sys.exit(1)
     finally:
@@ -223,16 +223,16 @@ def activate_user(username):
     try:
         user = db.query(User).filter(User.username == username).first()
         if not user:
-            click.echo(f"✗ User '{username}' not found", err=True)
+            click.echo(f"[FAIL] User '{username}' not found", err=True)
             sys.exit(1)
         
         user.is_active = True
         db.commit()
         
-        click.echo(f"✓ User '{username}' activated")
+        click.echo(f"[OK] User '{username}' activated")
         
     except Exception as e:
-        click.echo(f"✗ Error activating user: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error activating user: {str(e)}", err=True)
         db.rollback()
         sys.exit(1)
     finally:
@@ -248,7 +248,7 @@ def delete_user(username, force):
     try:
         user = db.query(User).filter(User.username == username).first()
         if not user:
-            click.echo(f"✗ User '{username}' not found", err=True)
+            click.echo(f"[FAIL] User '{username}' not found", err=True)
             sys.exit(1)
         
         # Count associated data
@@ -256,7 +256,7 @@ def delete_user(username, force):
         
         # Confirm deletion
         if not force:
-            click.echo(f"\n⚠ Warning: This will permanently delete:")
+            click.echo(f"\n[WARN] Warning: This will permanently delete:")
             click.echo(f"  - User: {username}")
             click.echo(f"  - Links: {link_count}")
             click.echo(f"  - All associated tags and data")
@@ -268,10 +268,10 @@ def delete_user(username, force):
         db.delete(user)
         db.commit()
         
-        click.echo(f"✓ User '{username}' and all associated data deleted")
+        click.echo(f"[OK] User '{username}' and all associated data deleted")
         
     except Exception as e:
-        click.echo(f"✗ Error deleting user: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error deleting user: {str(e)}", err=True)
         db.rollback()
         sys.exit(1)
     finally:
@@ -290,7 +290,7 @@ def view_failed_links(username, limit):
         if username:
             user = db.query(User).filter(User.username == username).first()
             if not user:
-                click.echo(f"✗ User '{username}' not found", err=True)
+                click.echo(f"[FAIL] User '{username}' not found", err=True)
                 sys.exit(1)
             query = query.filter(Link.user_id == user.id)
         
@@ -313,7 +313,7 @@ def view_failed_links(username, limit):
             click.echo()
         
     except Exception as e:
-        click.echo(f"✗ Error viewing failed links: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error viewing failed links: {str(e)}", err=True)
         sys.exit(1)
     finally:
         db.close()
@@ -327,7 +327,7 @@ def retry_failed(username):
     try:
         user = db.query(User).filter(User.username == username).first()
         if not user:
-            click.echo(f"✗ User '{username}' not found", err=True)
+            click.echo(f"[FAIL] User '{username}' not found", err=True)
             sys.exit(1)
         
         failed_links = db.query(Link).filter(
@@ -346,10 +346,10 @@ def retry_failed(username):
         
         db.commit()
         
-        click.echo(f"✓ Reset {len(failed_links)} failed link(s) to pending")
+        click.echo(f"[OK] Reset {len(failed_links)} failed link(s) to pending")
         
     except Exception as e:
-        click.echo(f"✗ Error retrying failed links: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error retrying failed links: {str(e)}", err=True)
         db.rollback()
         sys.exit(1)
     finally:
@@ -364,11 +364,11 @@ def test_github(username):
     try:
         user = db.query(User).filter(User.username == username).first()
         if not user:
-            click.echo(f"✗ User '{username}' not found", err=True)
+            click.echo(f"[FAIL] User '{username}' not found", err=True)
             sys.exit(1)
         
         if not user.github_enabled:
-            click.echo(f"✗ GitHub integration is not enabled for user '{username}'", err=True)
+            click.echo(f"[FAIL] GitHub integration is not enabled for user '{username}'", err=True)
             sys.exit(1)
         
         click.echo(f"Testing GitHub connection for {username}...\n")
@@ -376,15 +376,15 @@ def test_github(username):
         success, message = test_github_connection(user)
         
         if success:
-            click.echo("✓ Connection successful!\n")
+            click.echo("[OK] Connection successful!\n")
             click.echo(message)
         else:
-            click.echo("✗ Connection failed!\n", err=True)
+            click.echo("[FAIL] Connection failed!\n", err=True)
             click.echo(message, err=True)
             sys.exit(1)
         
     except Exception as e:
-        click.echo(f"✗ Error testing GitHub connection: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error testing GitHub connection: {str(e)}", err=True)
         sys.exit(1)
     finally:
         db.close()
@@ -407,7 +407,7 @@ def import_tags(username):
     try:
         user = db.query(User).filter(User.username == username).first()
         if not user:
-            click.echo(f"✗ User '{username}' not found", err=True)
+            click.echo(f"[FAIL] User '{username}' not found", err=True)
             sys.exit(1)
         
         click.echo(f"Importing tags from {user.repo_owner}/{user.repo_name}...")
@@ -416,10 +416,10 @@ def import_tags(username):
         count, error = import_tags_from_journals(user, db)
         
         if error:
-            click.echo(f"⚠ Warning: {error}")
+            click.echo(f"[WARN] Warning: {error}")
         
         if count > 0:
-            click.echo(f"✓ Imported {count} tag(s)")
+            click.echo(f"[OK] Imported {count} tag(s)")
             click.echo("\nImported tags:")
             for tag in sorted(user.tags):
                 click.echo(f"  #{tag}")
@@ -427,7 +427,7 @@ def import_tags(username):
             click.echo("No new tags imported")
         
     except Exception as e:
-        click.echo(f"✗ Error importing tags: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error importing tags: {str(e)}", err=True)
         sys.exit(1)
     finally:
         db.close()
@@ -443,14 +443,14 @@ def backfill_summaries(username):
     from src.utils.logging import logger
     
     if not settings.llm_enabled:
-        click.echo("✗ LLM service is not enabled. Set LLM_ENABLED=true in .env", err=True)
+        click.echo("[FAIL] LLM service is not enabled. Set LLM_ENABLED=true in .env", err=True)
         sys.exit(1)
     
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.username == username).first()
         if not user:
-            click.echo(f"✗ User '{username}' not found", err=True)
+            click.echo(f"[FAIL] User '{username}' not found", err=True)
             sys.exit(1)
         
         # Query links that need summarization
@@ -504,13 +504,13 @@ def backfill_summaries(username):
                     link.llm_model = settings.llm_model_name
                     link.summary_error = None
                     db.commit()
-                    click.echo(f"  ✓ Summary generated ({len(summary)} chars)")
+                    click.echo(f"  [OK] Summary generated ({len(summary)} chars)")
                     success_count += 1
                 else:
                     link.summary_retry_count += 1
                     link.summary_error = (error or "Summarization failed")[:500]
                     db.commit()
-                    click.echo(f"  ✗ Failed: {error}")
+                    click.echo(f"  [FAIL] Failed: {error}")
                     failed_count += 1
                     logger.error(f"Backfill failed for link {link.id}: {error}")
                     
@@ -518,14 +518,14 @@ def backfill_summaries(username):
                 link.summary_retry_count += 1
                 link.summary_error = "Summarization failed"[:500]
                 db.commit()
-                click.echo(f"  ✗ Error: {str(e)}")
+                click.echo(f"  [FAIL] Error: {str(e)}")
                 failed_count += 1
                 logger.error(f"Backfill error for link {link.id}: {e}", exc_info=True)
         
-        click.echo(f"\n✓ Backfill complete: {success_count} summaries generated, {failed_count} failures")
+        click.echo(f"\n[OK] Backfill complete: {success_count} summaries generated, {failed_count} failures")
         
     except Exception as e:
-        click.echo(f"✗ Error during backfill: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error during backfill: {str(e)}", err=True)
         sys.exit(1)
     finally:
         db.close()
@@ -540,7 +540,7 @@ def reset_summary_retries(username, link_id):
     try:
         user = db.query(User).filter(User.username == username).first()
         if not user:
-            click.echo(f"✗ User '{username}' not found", err=True)
+            click.echo(f"[FAIL] User '{username}' not found", err=True)
             sys.exit(1)
         
         if link_id:
@@ -551,13 +551,13 @@ def reset_summary_retries(username, link_id):
             ).first()
             
             if not link:
-                click.echo(f"✗ Link {link_id} not found for user '{username}'", err=True)
+                click.echo(f"[FAIL] Link {link_id} not found for user '{username}'", err=True)
                 sys.exit(1)
             
             link.summary_retry_count = 0
             link.summary_error = None
             db.commit()
-            click.echo(f"✓ Reset retry count for link {link_id}")
+            click.echo(f"[OK] Reset retry count for link {link_id}")
         else:
             # Reset all failed links for user
             links = db.query(Link).filter(
@@ -575,10 +575,10 @@ def reset_summary_retries(username, link_id):
                 link.summary_error = None
             
             db.commit()
-            click.echo(f"✓ Reset retry count for {count} link(s)")
+            click.echo(f"[OK] Reset retry count for {count} link(s)")
         
     except Exception as e:
-        click.echo(f"✗ Error resetting retries: {str(e)}", err=True)
+        click.echo(f"[FAIL] Error resetting retries: {str(e)}", err=True)
         sys.exit(1)
     finally:
         db.close()

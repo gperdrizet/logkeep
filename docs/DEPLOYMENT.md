@@ -760,7 +760,7 @@ docker exec logkeep-green curl http://localhost:8000/health
 
 **Problem:** The `app-green` container failed health checks during startup with "Container is unhealthy" error.
 
-**Status:** ✅ RESOLVED
+**Status:** [OK] RESOLVED
 
 **Root Cause:** The green container configuration was missing the `extra_hosts` setting that allows containers to access the host network. The blue container had this configured:
 
@@ -821,7 +821,7 @@ docker-compose -f docker-compose.prod.yml --env-file .env.production up -d postg
 
 **Problem:** The application loaded and functioned correctly, but CSS styling was missing. Pages appeared unstyled.
 
-**Status:** ✅ RESOLVED
+**Status:** [OK] RESOLVED
 
 **Root Cause:** The nginx configuration file `/etc/nginx/conf.d/logkeep.conf` had a static files location block that attempted to serve files from `/var/www/logkeep/static/`, which doesn't exist. This block took precedence over proxying requests to the FastAPI application.
 
@@ -884,7 +884,7 @@ curl -I https://logkeep.perdrizet.org/static/css/style.css
 
 **Problem:** GitHub Actions workflows failed with multiple configuration issues during initial setup.
 
-**Status:** ✅ RESOLVED
+**Status:** [OK] RESOLVED
 
 **Issues Encountered and Resolved:**
 
@@ -988,14 +988,14 @@ curl -I https://logkeep.perdrizet.org/static/css/style.css
 
 **Problem:** The `scripts/deploy.sh` blue/green deployment script fails in CI/CD pipeline despite working configurations.
 
-**Status:** ⚠️ IN PROGRESS - Deployment automation partially working, requires debugging on VPS.
+**Status:** [WARN] IN PROGRESS - Deployment automation partially working, requires debugging on VPS.
 
 **Working Components:**
-- ✅ Docker image builds successfully on push to main
-- ✅ Images pushed to Docker Hub and GitHub Container Registry
-- ✅ GitHub Actions can SSH to VPS (port 44441, correct credentials)
-- ✅ Passwordless sudo configured for nginx commands (`/etc/sudoers.d/logkeep-deploy`)
-- ✅ Application continues running during failed deployments (no downtime)
+- [OK] Docker image builds successfully on push to main
+- [OK] Images pushed to Docker Hub and GitHub Container Registry
+- [OK] GitHub Actions can SSH to VPS (port 44441, correct credentials)
+- [OK] Passwordless sudo configured for nginx commands (`/etc/sudoers.d/logkeep-deploy`)
+- [OK] Application continues running during failed deployments (no downtime)
 
 **Issues Resolved:**
 - Fixed Docker tag generation (removed invalid branch prefix)

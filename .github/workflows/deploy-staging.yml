@@ -69,17 +69,17 @@ jobs:
           ssh $VPS_USER@$VPS_HOST << 'EOF'
             # Test health endpoint
             if docker exec logkeep-staging curl -f http://localhost:8000/health > /dev/null 2>&1; then
-              echo "✅ Staging health check passed"
+              echo "[OK] Staging health check passed"
             else
-              echo "❌ Staging health check failed"
+              echo "[FAIL] Staging health check failed"
               exit 1
             fi
             
             # Test database connectivity
             if docker exec logkeep-staging python -c "from src.utils.database import get_db; next(get_db())" > /dev/null 2>&1; then
-              echo "✅ Database connectivity OK"
+              echo "[OK] Database connectivity OK"
             else
-              echo "⚠️  Database connectivity test skipped or failed"
+              echo "[WARN]  Database connectivity test skipped or failed"
             fi
           EOF
 
@@ -87,16 +87,16 @@ jobs:
         if: always()
         run: |
           if [ "${{ job.status }}" == "success" ]; then
-            echo "### ✅ Staging Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+            echo "### [OK] Staging Deployment Successful!" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "**Image:** \`${{ env.IMAGE_TAG }}\`" >> $GITHUB_STEP_SUMMARY
             echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
             echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
-            echo "🧪 Staging is ready for testing" >> $GITHUB_STEP_SUMMARY
-            echo "🔗 Access staging at: http://${{ secrets.VPS_HOST }}:8003" >> $GITHUB_STEP_SUMMARY
+            echo " Staging is ready for testing" >> $GITHUB_STEP_SUMMARY
+            echo " Access staging at: http://${{ secrets.VPS_HOST }}:8003" >> $GITHUB_STEP_SUMMARY
           else
-            echo "### ❌ Staging Deployment Failed!" >> $GITHUB_STEP_SUMMARY
+            echo "### [FAIL] Staging Deployment Failed!" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "Check the logs above for details" >> $GITHUB_STEP_SUMMARY
           fi

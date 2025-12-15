@@ -73,7 +73,7 @@ jobs:
 
       - name: Summary
         run: |
-          echo "### Docker Image Built Successfully! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "### Docker Image Built Successfully! " >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
