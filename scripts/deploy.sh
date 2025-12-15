@@ -108,15 +108,15 @@ wait_for_health() {
 }
 
 switch_nginx_via_symlink() {
-    local new_slot=$1
-    local old_slot=$2
+    local new_slot="$1"
+    local old_slot="$2"
     local nginx_configs_dir="/etc/nginx/logkeep-configs"
     local nginx_conf_dir="/etc/nginx/conf.d"
     local symlink_path="${nginx_conf_dir}/logkeep.conf"
     local new_config="${nginx_configs_dir}/${new_slot}.conf"
     
-    log_step "Switching nginx to $new_slot via symlink..."
-    log_info "Creating symlink: $symlink_path -> $new_config"
+    log_step "Switching nginx to ${new_slot} via symlink..."
+    log_info "Target: ${new_config}"
     
     # Update symlink on system to point to new config
     sudo ln -sf "$new_config" "$symlink_path"
