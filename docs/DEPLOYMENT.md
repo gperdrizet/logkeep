@@ -970,6 +970,71 @@ curl -I https://logkeep.perdrizet.org/static/css/style.css
 
 **Recommendation:** Option A (VPS staging container) provides good balance of cost and testing fidelity. Can share database server with different schema or use separate staging database.
 
+### Automated deployment script issues
+
+**Problem:** The `scripts/deploy.sh` blue/green deployment script fails in CI/CD pipeline despite working configurations.
+
+**Status:** ⚠️ IN PROGRESS - Deployment automation partially working, requires debugging on VPS.
+
+**Working Components:**
+- ✅ Docker image builds successfully on push to main
+- ✅ Images pushed to Docker Hub and GitHub Container Registry
+- ✅ GitHub Actions can SSH to VPS (port 44441, correct credentials)
+- ✅ Passwordless sudo configured for nginx commands (`/etc/sudoers.d/logkeep-deploy`)
+- ✅ Application continues running during failed deployments (no downtime)
+
+**Issues Resolved:**
+- Fixed Docker tag generation (removed invalid branch prefix)
+- Fixed SSH connection (added port 44441 to workflow config)
+- Fixed nginx checks (changed from hard fail to warning)
+- Fixed nginx switching (updated from container names to port numbers 8001/8002)
+- Added `--env-file .env.production` flag to all docker-compose commands
+- Added in-place update logic when green container doesn't exist
+
+**Current Issue:**
+- Deployment script still fails when executed via GitHub Actions
+- Exact failure point unclear - needs manual testing on VPS to debug
+- Script expects blue/green infrastructure but only blue container exists
+- Need to verify script behavior with current VPS state
+
+**Next Steps to Complete CI/CD:**
+1. **Manual Testing Required:**
+   ```bash
+   # SSH to VPS and test deploy script manually
+   ssh gatekeeper
+   cd /opt/logkeep
+   ./scripts/deploy.sh latest
+   
+   # Observe full output and identify exact failure point
+   # Test with different scenarios (blue only, blue+green, etc.)
+   ```
+
+2. **Verify Deployment Prerequisites:**
+   - Confirm all environment variables loaded correctly
+   - Check docker-compose service definitions for app-green
+   - Verify postgres container is healthy (currently showing weird name)
+   - Test health checks work for new containers
+
+3. **Fix Remaining Script Issues:**
+   - Update logic for initial deployment (no green container)
+   - Handle postgres container recreation properly
+   - Add better error messages and logging
+   - Test rollback functionality
+
+4. **Re-test CI/CD Pipeline:**
+   - Push small change to trigger automated deployment
+   - Monitor full workflow execution
+   - Verify application updates successfully
+   - Document final working configuration
+
+**Workaround for Now:**
+- Manual deployments work fine: `docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --no-deps app-blue`
+- CI/CD builds and pushes images successfully
+- Can manually pull and restart containers when needed
+- Site remains stable during failed automation attempts
+
+**TODO:** Resume CI/CD debugging after addressing other deployment priorities (metrics endpoint, Grafana dashboard, backup testing, etc.).
+
 ### Docker Compose log streaming error
 
 **Problem:** When following container logs with `-f` flag, you may see:
