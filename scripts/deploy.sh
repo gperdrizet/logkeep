@@ -31,19 +31,19 @@ OBSERVATION_PERIOD=300  # 5 minutes in seconds
 # =============================================================================
 
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    echo -e "${GREEN}[INFO]${NC} $1" >&2
 }
 
 log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
+    echo -e "${YELLOW}[WARN]${NC} $1" >&2
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}[ERROR]${NC} $1" >&2
 }
 
 log_step() {
-    echo -e "${BLUE}[STEP]${NC} $1"
+    echo -e "${BLUE}[STEP]${NC} $1" >&2
 }
 
 check_container_running() {
@@ -98,11 +98,11 @@ wait_for_health() {
             log_info "$container is healthy! (took $((i * HEALTH_CHECK_INTERVAL))s)"
             return 0
         fi
-        echo -n "."  # Progress indicator
+        echo -n "." >&2  # Progress indicator
         sleep $HEALTH_CHECK_INTERVAL
     done
     
-    echo ""  # New line after dots
+    echo "" >&2  # New line after dots
     log_error "$container failed health checks after $((retries * HEALTH_CHECK_INTERVAL))s"
     return 1
 }
@@ -307,11 +307,11 @@ observe_new_deployment() {
         
         # Show countdown
         local remaining=$((end_time - $(date +%s)))
-        echo -ne "\rTime remaining: ${remaining}s "
+        echo -ne "\rTime remaining: ${remaining}s " >&2
         sleep 10
     done
     
-    echo ""  # New line after countdown
+    echo "" >&2  # New line after countdown
     log_info "Observation period completed successfully"
 }
 
