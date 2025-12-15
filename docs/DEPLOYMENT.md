@@ -282,7 +282,7 @@ docker-compose -f docker-compose.prod.yml logs -f
 
 **Note:** The `--env-file .env.production` flag is required because Docker Compose only auto-loads `.env` by default, not `.env.production`. We exclude the containerized `nginx` service since we're using the system Nginx that's already configured.
 
-**TODO:** We're starting only `app-blue` for initial deployment. The `app-green` container is experiencing health check failures and needs investigation. For now, blue-green deployments are disabled. This should be revisited once the application is stable. See [Issue: Green container health check failures](#green-container-health-check-failures).
+**Note:** Both `app-blue` and `app-green` containers are now fully functional and healthy. Blue-green deployment capability is enabled. The deployment script (`scripts/deploy.sh`) can switch traffic between containers for zero-downtime updates.
 
 **TODO:** The `loki` container may experience restart loops during initial deployment. This is a known issue that needs investigation. Loki is used for log aggregation and is not critical for application functionality. See [Issue: Loki container restart loops](#loki-container-restart-loops).
 
@@ -758,26 +758,40 @@ docker exec logkeep-green curl http://localhost:8000/health
 
 ### Green container health check failures
 
-**Problem:** The `app-green` container fails health checks during startup with "Container is unhealthy" error.
+**Problem:** The `app-green` container failed health checks during startup with "Container is unhealthy" error.
 
-**Status:** Known issue - currently under investigation. Initial deployment uses only `app-blue` container.
+**Status:** ✅ RESOLVED
 
-**Temporary workaround:** Start only essential services without green container:
+**Root Cause:** The green container configuration was missing the `extra_hosts` setting that allows containers to access the host network. The blue container had this configured:
 
-```bash
-docker-compose -f docker-compose.prod.yml --env-file .env.production up -d postgres app-blue prometheus grafana loki postgres-exporter
+```yaml
+extra_hosts:
+  - "host.docker.internal:host-gateway"
 ```
 
-**Impact:** Blue-green deployment capability is temporarily disabled. Updates must be deployed by restarting `app-blue` container instead of switching traffic between blue and green.
+This is required for the application to access the Ollama LLM service running via SSH tunnel on the host (port 11434). Without this configuration, the container couldn't reach the LLM service through the Docker network gateway (172.18.0.1), causing initialization or health check failures.
 
-**Investigation needed:**
-1. Check if green container health check endpoint is accessible
-2. Verify green container logs: `docker logs logkeep-green`
-3. Compare blue and green container configurations in `docker-compose.prod.yml`
-4. Test if both containers can run simultaneously without port conflicts
-5. Verify health check timeout and retry settings are appropriate
+**Solution:** Added `extra_hosts` configuration to the green container in `docker-compose.prod.yml`:
 
-**TODO:** Re-enable green container once health check issue is resolved. Update deployment scripts to use blue-green switching mechanism.
+```yaml
+app-green:
+  # ... other configuration ...
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+```
+
+**Verification:**
+```bash
+# Both containers now run successfully
+sudo docker ps --filter "name=logkeep-blue\|logkeep-green"
+# Shows: logkeep-blue Up (healthy), logkeep-green Up (healthy)
+
+# Both respond to health checks
+curl http://127.0.0.1:8001/health  # Blue: {"status":"healthy","database":"connected"}
+curl http://127.0.0.1:8002/health  # Green: {"status":"healthy","database":"connected"}
+```
+
+**Impact:** Blue-green deployment capability is now fully functional. The deployment script can switch traffic between blue and green containers for zero-downtime deployments.
 
 ### Loki container restart loops
 
