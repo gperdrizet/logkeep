@@ -7,14 +7,15 @@
 # Allow siderealyear to run nginx and system commands without password for deployment
 siderealyear ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
 siderealyear ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t *
-siderealyear ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
-siderealyear ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx
-siderealyear ALL=(ALL) NOPASSWD: /bin/systemctl start nginx
-siderealyear ALL=(ALL) NOPASSWD: /bin/systemctl stop nginx
-siderealyear ALL=(ALL) NOPASSWD: /bin/systemctl status nginx
-siderealyear ALL=(ALL) NOPASSWD: /bin/systemctl is-active nginx
-siderealyear ALL=(ALL) NOPASSWD: /bin/ln -sf /etc/nginx/logkeep-configs/* /etc/nginx/conf.d/logkeep.conf
-siderealyear ALL=(ALL) NOPASSWD: /bin/readlink /etc/nginx/conf.d/logkeep.conf
-siderealyear ALL=(ALL) NOPASSWD: /bin/ls -l /etc/nginx/conf.d/logkeep.conf
-siderealyear ALL=(ALL) NOPASSWD: /bin/cp /opt/logkeep/nginx/*.conf /etc/nginx/logkeep-configs/
-siderealyear ALL=(ALL) NOPASSWD: /bin/cp /opt/logkeep/nginx/*.conf /etc/nginx/conf.d/
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload nginx
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart nginx
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/systemctl start nginx
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop nginx
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/systemctl status nginx
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active nginx
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active --quiet nginx
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/ln -sf /etc/nginx/logkeep-configs/* /etc/nginx/conf.d/logkeep.conf
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/readlink /etc/nginx/conf.d/logkeep.conf
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/ls -l /etc/nginx/conf.d/logkeep.conf
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/cp /opt/logkeep/nginx/*.conf /etc/nginx/logkeep-configs/
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/cp /opt/logkeep/nginx/*.conf /etc/nginx/conf.d/
