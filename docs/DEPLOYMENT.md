@@ -197,9 +197,17 @@ ssh gatekeeper "curl -s http://localhost:11434/api/tags"
 
 ### Step 4: configure docker container to access tunnel
 
-**Important:** Docker containers cannot reach `localhost:11434` because from inside a container, `localhost` refers to the container itself, not the VPS host. The SSH tunnel endpoint on the VPS host must be accessed via Docker's bridge gateway IP.
+**Important:** Docker containers cannot reach `localhost:11434` because from inside a container, `localhost` refers to the container itself, not the VPS host. The SSH tunnel endpoint on the VPS host must be accessed via Docker's network gateway IP.
 
-Update `.env.production` on the VPS to use Docker's default bridge gateway:
+First, find your Docker network gateway IP:
+
+```bash
+# On VPS
+sudo docker network inspect logkeep_logkeep-network | grep Gateway
+# Should show: "Gateway": "172.18.0.1" (or similar)
+```
+
+Update `.env.production` on the VPS to use this gateway IP:
 
 ```bash
 # On VPS
@@ -209,11 +217,42 @@ sudo nano .env.production
 # Change LLM_BASE_URL from:
 LLM_BASE_URL=http://localhost:11434
 
-# To:
-LLM_BASE_URL=http://172.17.0.1:11434
+# To (use your actual gateway IP):
+LLM_BASE_URL=http://172.18.0.1:11434
 ```
 
-The IP `172.17.0.1` is Docker's default bridge network gateway, which allows containers to reach services on the host machine. This lets the LogKeep container connect to the SSH tunnel endpoint.
+### Step 5: configure firewall to allow docker access
+
+**Critical:** UFW firewall blocks Docker containers from reaching the host by default. You must explicitly allow the Docker network to access port 11434:
+
+```bash
+# On VPS - allow Docker network to reach Ollama tunnel
+sudo ufw allow from 172.18.0.0/16 to any port 11434 proto tcp comment "Docker to Ollama tunnel"
+
+# Verify the rule was added
+sudo ufw status verbose
+```
+
+Without this rule, containers will timeout when trying to reach the tunnel.
+
+### Step 6: enable SSH gateway ports
+
+For the SSH tunnel to be accessible from Docker containers, the VPS SSH server must allow gateway ports:
+
+```bash
+# On VPS
+echo "GatewayPorts yes" | sudo tee -a /etc/ssh/sshd_config
+sudo systemctl restart sshd
+
+# Restart tunnel to bind to all interfaces
+# On LOCAL machine:
+sudo systemctl restart logkeep-tunnel
+
+# Verify tunnel is listening on 0.0.0.0 (not just 127.0.0.1)
+# On VPS:
+sudo ss -tlnp | grep 11434
+# Should show: LISTEN 0.0.0.0:11434
+```
 
 ---
 
@@ -593,7 +632,70 @@ sudo nginx -t
 sudo tail -f /var/log/nginx/error.log
 ```
 
-### Ollama not accessible
+### Ollama not accessible from Docker container
+
+**Problem:** AI summarization fails with "Connection refused" or timeout errors when trying to reach Ollama.
+
+**Symptoms:**
+- Logs show: `ERROR - Unexpected error during summarization: [Errno 111] Connection refused`
+- Or: `URLError: <urlopen error timed out>`
+- Testing from VPS host works: `curl http://localhost:11434/api/tags` succeeds
+- Testing from container fails: `docker exec logkeep-blue python -c "import urllib.request; urllib.request.urlopen('http://172.18.0.1:11434/api/tags')"`
+
+**Cause:** Docker containers are isolated and cannot reach `localhost` on the host. They must use the Docker network gateway IP. Additionally, UFW firewall blocks Docker network traffic to the host by default.
+
+**Solution:**
+
+1. **Find your Docker network gateway IP:**
+```bash
+sudo docker network inspect logkeep_logkeep-network | grep Gateway
+# Example output: "Gateway": "172.18.0.1"
+```
+
+2. **Update `.env.production` with correct gateway IP:**
+```bash
+cd /opt/logkeep
+sudo nano .env.production
+# Set: LLM_BASE_URL=http://172.18.0.1:11434 (use your actual gateway IP)
+```
+
+3. **Add UFW firewall rule to allow Docker network:**
+```bash
+sudo ufw allow from 172.18.0.0/16 to any port 11434 proto tcp comment "Docker to Ollama tunnel"
+```
+
+4. **Enable SSH GatewayPorts on VPS:**
+```bash
+echo "GatewayPorts yes" | sudo tee -a /etc/ssh/sshd_config
+sudo systemctl restart sshd
+```
+
+5. **Restart tunnel on local machine:**
+```bash
+sudo systemctl restart logkeep-tunnel
+```
+
+6. **Verify tunnel is listening on all interfaces:**
+```bash
+sudo ss -tlnp | grep 11434
+# Should show: LISTEN 0.0.0.0:11434 (not 127.0.0.1:11434)
+```
+
+7. **Recreate container to load new environment:**
+```bash
+cd /opt/logkeep
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production stop app-blue
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production rm -f app-blue
+sudo docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app-blue
+```
+
+8. **Test connection from container:**
+```bash
+sudo docker exec logkeep-blue python -c "import urllib.request; print(urllib.request.urlopen('http://172.18.0.1:11434/api/tags', timeout=5).read().decode())"
+# Should return JSON with model info
+```
+
+### Ollama tunnel check
 
 ```bash
 # On local machine, check tunnel
@@ -697,22 +799,66 @@ docker-compose -f docker-compose.prod.yml --env-file .env.production up -d postg
 
 ### Static files (CSS) not loading
 
-**Problem:** The application loads and functions correctly, but CSS styling is missing. Pages appear unstyled.
+**Problem:** The application loaded and functioned correctly, but CSS styling was missing. Pages appeared unstyled.
 
-**Status:** Known issue - application is functional but visual appearance is affected.
+**Status:** ✅ RESOLVED
 
-**Impact:** User interface lacks styling and formatting. Application functionality (login, link submission, etc.) still works.
+**Root Cause:** The nginx configuration file `/etc/nginx/conf.d/logkeep.conf` had a static files location block that attempted to serve files from `/var/www/logkeep/static/`, which doesn't exist. This block took precedence over proxying requests to the FastAPI application.
 
-**Investigation needed:**
-1. Verify CSS files exist in container: `docker exec logkeep-blue ls -la /app/src/static/css/`
-2. Check browser console (F12) for 404 errors on CSS file requests
-3. Verify static file route configuration in main application file
-4. Check if Nginx is properly proxying static file requests
-5. Test direct access to static files: `curl http://127.0.0.1:8001/static/css/style.css`
-6. Verify static file mounting in docker-compose volumes
-7. Check FastAPI/Starlette static file configuration
+```nginx
+# This was causing the issue:
+location /static/ {
+    alias /var/www/logkeep/static/;
+    expires 30d;
+    add_header Cache-Control "public, immutable";
+}
+```
 
-**TODO:** Debug and fix static file serving to restore application styling.
+**Solution:** Comment out the nginx static files location block to allow all `/static/` requests to be proxied to the FastAPI application:
+
+```bash
+# Comment out the static files block
+sudo sed -i '/# Static files/,/^    }/s/^/#/' /etc/nginx/conf.d/logkeep.conf
+
+# Test and reload nginx
+sudo nginx -t
+sudo systemctl reload nginx
+
+# Verify CSS is now accessible
+curl -I https://logkeep.perdrizet.org/static/css/style.css
+```
+
+**Verification:**
+- Direct container access worked: `curl http://127.0.0.1:8001/static/css/style.css` returned 200 OK
+- After nginx config fix: `curl https://logkeep.perdrizet.org/static/css/style.css` returns 200 OK
+- CSS files properly served by FastAPI's StaticFiles mount
+
+**Lessons Learned:**
+- Always verify nginx location block priorities when debugging 404s
+- FastAPI can handle static file serving efficiently in production
+- Test direct container access to isolate whether issue is app or proxy layer
+
+### Grafana dashboard metrics incomplete
+
+**Problem:** Grafana dashboard shows errors for "Application Status" and "Prometheus Status" panels, and container metrics (CPU/memory) show no data.
+
+**Status:** Known issue - dashboard needs updates after application metrics endpoint is implemented.
+
+**Impact:** Dashboard shows database metrics and application data (links, users) correctly, but missing:
+- Application health status from Prometheus
+- Container CPU and memory metrics (requires cAdvisor or node-exporter)
+- Application-specific metrics from `/metrics` endpoint
+
+**Cause:** 
+1. LogKeep application doesn't expose a `/metrics` endpoint yet (returns 404)
+2. cAdvisor and node-exporter containers not included in deployment
+3. Dashboard queries reference non-existent job names and metrics
+
+**TODO:** 
+1. Add Prometheus metrics endpoint to LogKeep application
+2. Consider adding node-exporter for system metrics
+3. Update dashboard queries to match actual available metrics
+4. Test and validate all panels display data correctly
 
 ### Docker Compose log streaming error
 
@@ -752,6 +898,7 @@ After successful deployment:
 4. **Document any issues:** Update runbook with solutions
 5. **Invite test users:** Generate invite codes
 6. **Plan scaling:** Monitor resource usage and plan upgrades
+7. **Clean up Ionos firewall:** Remove any temporary firewall rules from Ionos admin interface now that UFW is configured on the VPS
 
 ---
 
