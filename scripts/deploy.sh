@@ -202,7 +202,7 @@ preflight_checks() {
 pull_new_image() {
     log_step "Pulling new Docker image: $IMAGE_NAME..."
     
-    if ! docker pull "$IMAGE_NAME"; then
+    if ! docker pull "$IMAGE_NAME" >&2; then
         log_error "Failed to pull Docker image"
         exit 1
     fi
@@ -229,22 +229,22 @@ deploy_to_inactive_slot() {
     # For in-place update, just restart with new image
     if [ "$new_slot" = "$active_slot" ]; then
         log_info "Performing in-place update of $new_container..."
-        docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --no-deps app-blue
+        docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --no-deps app-blue >&2
     else
         # Stop the inactive container if it's running
         if docker ps -a --filter "name=$new_container" --format "{{.Names}}" | grep -q "$new_container"; then
             log_info "Stopping existing $new_container container..."
-            docker stop "$new_container" || true
-            docker rm "$new_container" || true
+            docker stop "$new_container" >&2 || true
+            docker rm "$new_container" >&2 || true
         fi
         
         # Start new container
         log_info "Starting $new_container with new image..."
         
         if [ "$new_slot" = "green" ]; then
-            docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app-green
+            docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app-green >&2
         else
-            docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app-blue
+            docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app-blue >&2
         fi
     fi
     
@@ -322,7 +322,7 @@ cleanup_old_deployment() {
     log_step "Cleaning up old deployment ($old_slot)..."
     
     if check_container_running "$old_container"; then
-        docker stop "$old_container"
+        docker stop "$old_container" >&2
         log_info "Stopped $old_container"
     fi
     
