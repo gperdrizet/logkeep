@@ -15,6 +15,7 @@ LogKeep helps you capture web content from your phone and automatically adds it 
 - **Multi-user** - Invite-only with encrypted GitHub token storage
 - **Analytics** - Score and tag usage histograms
 - **Admin CLI** - User, invite, and tag management
+- **Blue/Green Deployment** - Zero-downtime deployments with automated health checks
 
 ## Quick Start
 
