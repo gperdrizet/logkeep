@@ -83,18 +83,19 @@ wait_for_health() {
     local container=$1
     local retries=$HEALTH_CHECK_RETRIES
     
-    log_info "Waiting for $container to become healthy..."
+    log_info "Waiting for $container to become healthy (timeout: ${retries}x${HEALTH_CHECK_INTERVAL}s = $((retries * HEALTH_CHECK_INTERVAL))s)..."
     
     for i in $(seq 1 $retries); do
         if docker exec "$container" curl -f http://localhost:8000/health > /dev/null 2>&1; then
-            log_info "$container is healthy!"
+            log_info "$container is healthy! (took $((i * HEALTH_CHECK_INTERVAL))s)"
             return 0
         fi
-        log_info "Health check attempt $i/$retries..."
+        echo -n "."  # Progress indicator
         sleep $HEALTH_CHECK_INTERVAL
     done
     
-    log_error "$container failed health checks"
+    echo ""  # New line after dots
+    log_error "$container failed health checks after $((retries * HEALTH_CHECK_INTERVAL))s"
     return 1
 }
 
