@@ -1,0 +1,38 @@
+# Grafana Datasources Configuration
+apiVersion: 1
+
+datasources:
+  # Prometheus
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://logkeep-prometheus:9090
+    isDefault: true
+    editable: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: 15s
+
+  # Loki for logs
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://logkeep-loki:3100
+    editable: true
+    jsonData:
+      maxLines: 1000
+
+  # PostgreSQL (optional - for direct database queries)
+  - name: PostgreSQL
+    type: postgres
+    url: logkeep-postgres:5432
+    database: logkeep
+    user: ${POSTGRES_USER}
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 14400
+    editable: false

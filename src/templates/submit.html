@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Submit - LogKeep{% endblock %}
+
+{% block content %}
+<h2>Submit</h2>
+
+{% if error %}
+<div class="alert alert-error">
+    {{ error }}
+</div>
+{% endif %}
+
+{% if success %}
+<div class="alert alert-success">
+    {{ success }}
+</div>
+{% endif %}
+
+<div class="card">
+    <form action="/submit" method="post" id="submit-form">
+        <div class="form-group">
+            <label for="url">Link</label>
+            <input type="url" id="url" name="url" placeholder="https://example.com/article" required autofocus>
+        </div>
+        
+        <div class="form-group">
+            <label for="tags">Tags</label>
+            <div style="position: relative;">
+                <input type="text" id="tags" name="tags" placeholder="Start typing to add tags..." autocomplete="off">
+                <div id="tag-suggestions" style="display: none; position: absolute; z-index: 1000; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 4px; max-height: 200px; overflow-y: auto; width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-top: 2px;"></div>
+            </div>
+            <div id="selected-tags" class="link-tags" style="margin-top: 8px;"></div>
+        </div>
+        
+        <input type="hidden" id="tags-hidden" name="tags_json" value="[]">
+        
+        <div class="form-group">
+            <label for="score">Score</label>
+            <input type="range" id="score" name="score" min="0" max="1" step="0.01" value="0.5" class="score-slider">
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Tag selection functionality (mobile-friendly autocomplete)
+    const tagsInput = document.getElementById('tags');
+    const selectedTagsDiv = document.getElementById('selected-tags');
+    const tagsHidden = document.getElementById('tags-hidden');
+    const suggestionsDiv = document.getElementById('tag-suggestions');
+    const userTags = {{ user_tags | tojson }};
+    let selectedTags = [];
+    let filteredTags = [];
+    
+    // Show suggestions as user types
+    tagsInput.addEventListener('input', function() {
+        const query = this.value.trim().toLowerCase();
+        
+        if (query.length === 0) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+        
+        // Filter tags that match the query and aren't already selected
+        filteredTags = userTags.filter(tag => 
+            tag.toLowerCase().includes(query) && !selectedTags.includes(tag)
+        );
+        
+        if (filteredTags.length === 0) {
+            suggestionsDiv.style.display = 'none';
+            return;
+        }
+        
+        // Display suggestions
+        suggestionsDiv.innerHTML = filteredTags.map(tag => 
+            `<div class="tag-suggestion" data-tag="${tag}">${tag}</div>`
+        ).join('');
+        suggestionsDiv.style.display = 'block';
+    });
+    
+    // Handle clicking on a suggestion
+    suggestionsDiv.addEventListener('click', function(e) {
+        const suggestionDiv = e.target.closest('.tag-suggestion');
+        if (suggestionDiv) {
+            const tag = suggestionDiv.getAttribute('data-tag');
+            addTag(tag);
+        }
+    });
+    
+    // Handle Enter key or comma/space separation
+    tagsInput.addEventListener('keypress', async function(e) {
+        if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
+            e.preventDefault();
+            await processTagInput();
+        }
+    });
+    
+    // Process tag input (handles multiple comma or space-separated tags)
+    async function processTagInput() {
+        const input = tagsInput.value.trim();
+        if (!input) return;
+        
+        // Split by commas or spaces, filter out empty strings
+        const tags = input.split(/[,\s]+/).map(t => t.toLowerCase().trim()).filter(t => t);
+        
+        for (const tag of tags) {
+            // If tag exists, add it
+            if (userTags.includes(tag) && !selectedTags.includes(tag)) {
+                addTag(tag);
+            } 
+            // If we have a single filtered result and it's this tag, use it
+            else if (filteredTags.length === 1 && filteredTags[0].toLowerCase() === tag) {
+                addTag(filteredTags[0]);
+            }
+            // Otherwise create it
+            else if (tag) {
+                await createAndAddTag(tag);
+            }
+        }
+    }
+    
+    // Hide suggestions when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!tagsInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.style.display = 'none';
+        }
+    });
+    
+    // Create new tag and add to collection
+    async function createAndAddTag(tag) {
+        try {
+            const formData = new FormData();
+            formData.append('tag', tag);
+            
+            const response = await fetch('/tags/add', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json'
+                },
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                // Successfully created tag - add to local list and selected tags
+                userTags.push(tag);
+                addTag(tag);
+            } else {
+                alert(`Failed to create tag: ${data.error || 'Unknown error'}`);
+            }
+        } catch (error) {
+            console.error('Error creating tag:', error);
+            alert('Failed to create tag. Please try again.');
+        }
+    }
+    
+    // Add tag helper function
+    function addTag(tag) {
+        if (!selectedTags.includes(tag)) {
+            selectedTags.push(tag);
+            updateSelectedTags();
+        }
+        tagsInput.value = '';
+        suggestionsDiv.style.display = 'none';
+        filteredTags = [];
+    }
+    
+    function updateSelectedTags() {
+        if (selectedTags.length === 0) {
+            selectedTagsDiv.innerHTML = '';
+        } else {
+            selectedTagsDiv.innerHTML = selectedTags.map(tag => 
+                `<span class="tag">
+                    ${tag}
+                    <button type="button" onclick="removeTag('${tag}')" class="tag-remove">×</button>
+                </span>`
+            ).join('');
+        }
+        tagsHidden.value = JSON.stringify(selectedTags);
+    }
+    
+    function removeTag(tag) {
+        selectedTags = selectedTags.filter(t => t !== tag);
+        updateSelectedTags();
+    }
+    
+    // Score slider display
+    const scoreSlider = document.getElementById('score');
+    const scoreValue = document.getElementById('score-value');
+    
+    scoreSlider.addEventListener('input', function() {
+        scoreValue.textContent = parseFloat(this.value).toFixed(1);
+    });
+    
+    // Form validation
+    document.getElementById('submit-form').addEventListener('submit', function(e) {
+        const url = document.getElementById('url').value.trim();
+        
+        if (!url) {
+            e.preventDefault();
+            alert('Please enter a URL');
+            return false;
+        }
+        
+        // URL is valid, form can submit
+        return true;
+    });
+</script>
+{% endblock %}

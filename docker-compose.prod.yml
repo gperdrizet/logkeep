@@ -1,0 +1,255 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database (shared between production and staging)
+  postgres:
+    image: postgres:16-alpine
+    container_name: logkeep-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: logkeep
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-staging-db.sql:/docker-entrypoint-initdb.d/init-staging-db.sql:ro
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - logkeep-network
+
+  # Blue Application (Active Production)
+  app-blue:
+    image: gperdrizet/logkeep:latest
+    container_name: logkeep-blue
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/logkeep
+      - GUNICORN_WORKERS=9
+      - LOG_LEVEL=info
+    ports:
+      - "127.0.0.1:8001:8000"
+    volumes:
+      - app_data_blue:/app/data
+      - app_logs_blue:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.slot=blue"
+      - "com.logkeep.environment=production"
+
+  # Green Application (New Deployment Target)
+  app-green:
+    image: gperdrizet/logkeep:latest
+    container_name: logkeep-green
+    restart: "no"  # Only started during deployments
+    env_file:
+      - .env.production
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/logkeep
+      - GUNICORN_WORKERS=9
+      - LOG_LEVEL=info
+    ports:
+      - "127.0.0.1:8002:8000"
+    volumes:
+      - app_data_green:/app/data
+      - app_logs_green:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.slot=green"
+      - "com.logkeep.environment=production"
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: logkeep-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/logkeep.conf:/etc/nginx/conf.d/logkeep.conf:ro
+      - ./nginx/grafana.conf:/etc/nginx/conf.d/grafana.conf:ro
+      - ./nginx/perdrizet.conf:/etc/nginx/conf.d/perdrizet.conf:ro
+      - /etc/nginx/certs:/etc/nginx/certs:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - app-blue
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.service=proxy"
+
+  # Prometheus Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: logkeep-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.service=monitoring"
+
+  # Grafana Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: logkeep-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+      - GF_SERVER_ROOT_URL=https://grafana.perdrizet.org
+      - GF_SERVER_DOMAIN=grafana.perdrizet.org
+      - GF_SMTP_ENABLED=true
+      - GF_SMTP_HOST=${SMTP_HOST}:${SMTP_PORT}
+      - GF_SMTP_USER=${SMTP_USER}
+      - GF_SMTP_PASSWORD=${SMTP_PASSWORD}
+      - GF_SMTP_FROM_ADDRESS=${SMTP_USER}
+      - GF_SMTP_FROM_NAME=LogKeep Monitoring
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+    depends_on:
+      - prometheus
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.service=monitoring"
+
+  # Loki Log Aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: logkeep-loki
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "127.0.0.1:3100:3100"
+    volumes:
+      - ./monitoring/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.service=monitoring"
+
+  # Promtail Log Shipper
+  promtail:
+    image: grafana/promtail:latest
+    container_name: logkeep-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - nginx_logs:/var/log/nginx:ro
+    depends_on:
+      - loki
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.service=monitoring"
+
+  # Node Exporter (System Metrics)
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: logkeep-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "127.0.0.1:9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.service=monitoring"
+
+  # PostgreSQL Exporter (Database Metrics)
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: logkeep-postgres-exporter
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/logkeep?sslmode=disable"
+    ports:
+      - "127.0.0.1:9187:9187"
+    depends_on:
+      - postgres
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.service=monitoring"
+
+networks:
+  logkeep-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+    driver: local
+  app_data_blue:
+    driver: local
+  app_data_green:
+    driver: local
+  app_logs_blue:
+    driver: local
+  app_logs_green:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
+    driver: local
+  nginx_logs:
+    driver: local

@@ -1,0 +1,17 @@
+version: '3.8'
+
+# Development overrides - mount source code for live reload
+# This file is automatically used by docker-compose alongside docker-compose.yml
+# For production, rename or delete this file
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"  # Expose PostgreSQL port for development
+
+  app:
+    volumes:
+      - ./src:/app/src:ro
+      - ./data:/app/data
+      - ./logs:/app/logs
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
