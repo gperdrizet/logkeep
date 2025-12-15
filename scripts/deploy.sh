@@ -180,22 +180,36 @@ deploy_to_inactive_slot() {
     local new_container="logkeep-${new_slot}"
     
     log_step "Current active slot: $active_slot"
-    log_step "Deploying to slot: $new_slot"
     
-    # Stop the inactive container if it's running
-    if docker ps -a --filter "name=$new_container" --format "{{.Names}}" | grep -q "$new_container"; then
-        log_info "Stopping existing $new_container container..."
-        docker stop "$new_container" || true
-        docker rm "$new_container" || true
+    # Check if green container exists - if not, do in-place update of blue
+    if [ "$new_slot" = "green" ] && ! docker ps -a --filter "name=logkeep-green" --format "{{.Names}}" | grep -q "logkeep-green"; then
+        log_warn "Green container doesn't exist yet. Performing in-place update of blue container."
+        new_slot="blue"
+        new_container="logkeep-blue"
     fi
     
-    # Start new container
-    log_info "Starting $new_container with new image..."
+    log_step "Deploying to slot: $new_slot"
     
-    if [ "$new_slot" = "green" ]; then
-        docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app-green
+    # For in-place update, just restart with new image
+    if [ "$new_slot" = "$active_slot" ]; then
+        log_info "Performing in-place update of $new_container..."
+        docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --no-deps app-blue
     else
-        docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app-blue
+        # Stop the inactive container if it's running
+        if docker ps -a --filter "name=$new_container" --format "{{.Names}}" | grep -q "$new_container"; then
+            log_info "Stopping existing $new_container container..."
+            docker stop "$new_container" || true
+            docker rm "$new_container" || true
+        fi
+        
+        # Start new container
+        log_info "Starting $new_container with new image..."
+        
+        if [ "$new_slot" = "green" ]; then
+            docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app-green
+        else
+            docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app-blue
+        fi
     fi
     
     # Wait for container to be healthy
