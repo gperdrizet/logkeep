@@ -83,10 +83,18 @@ wait_for_health() {
     local container=$1
     local retries=$HEALTH_CHECK_RETRIES
     
+    # Get the port from container name (blue=8001, green=8002)
+    local port
+    if [[ "$container" == *"blue"* ]]; then
+        port="8001"
+    else
+        port="8002"
+    fi
+    
     log_info "Waiting for $container to become healthy (timeout: ${retries}x${HEALTH_CHECK_INTERVAL}s = $((retries * HEALTH_CHECK_INTERVAL))s)..."
     
     for i in $(seq 1 $retries); do
-        if docker exec "$container" curl -f http://localhost:8000/health > /dev/null 2>&1; then
+        if curl -f http://127.0.0.1:${port}/health > /dev/null 2>&1; then
             log_info "$container is healthy! (took $((i * HEALTH_CHECK_INTERVAL))s)"
             return 0
         fi
@@ -261,6 +269,14 @@ observe_new_deployment() {
     local new_slot=$1
     local new_container="logkeep-${new_slot}"
     
+    # Get the port from slot name (blue=8001, green=8002)
+    local port
+    if [[ "$new_slot" == "blue" ]]; then
+        port="8001"
+    else
+        port="8002"
+    fi
+    
     log_step "Observing new deployment for $OBSERVATION_PERIOD seconds..."
     log_info "Monitoring $new_container for errors..."
     
@@ -276,7 +292,7 @@ observe_new_deployment() {
         fi
         
         # Check health endpoint
-        if ! docker exec "$new_container" curl -f http://localhost:8000/health > /dev/null 2>&1; then
+        if ! curl -f http://127.0.0.1:${port}/health > /dev/null 2>&1; then
             log_error "$new_container health check failed!"
             return 1
         fi
