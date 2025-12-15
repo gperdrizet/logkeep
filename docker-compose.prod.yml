@@ -98,8 +98,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/blue.conf:/etc/nginx/conf.d/blue.conf:ro
-      - ./nginx/green.conf:/etc/nginx/conf.d/green.conf:ro
+      - ./nginx/logkeep.conf:/etc/nginx/conf.d/logkeep.conf:ro
       - ./nginx/grafana.conf:/etc/nginx/conf.d/grafana.conf:ro
       - ./nginx/perdrizet.conf:/etc/nginx/conf.d/perdrizet.conf:ro
       - /etc/nginx/certs:/etc/nginx/certs:ro
