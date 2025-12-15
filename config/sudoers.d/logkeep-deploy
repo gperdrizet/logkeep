@@ -1,0 +1,20 @@
+# Sudoers configuration for LogKeep deployment automation
+# This file should be copied to /etc/sudoers.d/logkeep-deploy
+# Usage: sudo cp config/sudoers.d/logkeep-deploy /etc/sudoers.d/
+#        sudo chmod 0440 /etc/sudoers.d/logkeep-deploy
+#        sudo visudo -c  # Validate syntax
+
+# Allow siderealyear to run nginx and system commands without password for deployment
+siderealyear ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t
+siderealyear ALL=(ALL) NOPASSWD: /usr/sbin/nginx -t *
+siderealyear ALL=(ALL) NOPASSWD: /bin/systemctl reload nginx
+siderealyear ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx
+siderealyear ALL=(ALL) NOPASSWD: /bin/systemctl start nginx
+siderealyear ALL=(ALL) NOPASSWD: /bin/systemctl stop nginx
+siderealyear ALL=(ALL) NOPASSWD: /bin/systemctl status nginx
+siderealyear ALL=(ALL) NOPASSWD: /bin/systemctl is-active nginx
+siderealyear ALL=(ALL) NOPASSWD: /bin/ln -sf /etc/nginx/logkeep-configs/* /etc/nginx/conf.d/logkeep.conf
+siderealyear ALL=(ALL) NOPASSWD: /bin/readlink /etc/nginx/conf.d/logkeep.conf
+siderealyear ALL=(ALL) NOPASSWD: /bin/ls -l /etc/nginx/conf.d/logkeep.conf
+siderealyear ALL=(ALL) NOPASSWD: /bin/cp /opt/logkeep/nginx/*.conf /etc/nginx/logkeep-configs/
+siderealyear ALL=(ALL) NOPASSWD: /bin/cp /opt/logkeep/nginx/*.conf /etc/nginx/conf.d/
