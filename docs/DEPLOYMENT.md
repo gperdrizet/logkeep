@@ -104,17 +104,21 @@ Fill in:
 # Copy configs
 sudo cp nginx/*.conf /etc/nginx/conf.d/
 
+# Update nginx config to use localhost ports instead of Docker container names
+sudo sed -i 's/logkeep-blue:8000/127.0.0.1:8001/' /etc/nginx/conf.d/logkeep.conf
+
 # Enable sites
 sudo ln -s /etc/nginx/conf.d/logkeep.conf /etc/nginx/sites-enabled/
 sudo ln -s /etc/nginx/conf.d/grafana.conf /etc/nginx/sites-enabled/
 sudo ln -s /etc/nginx/conf.d/perdrizet.conf /etc/nginx/sites-enabled/
 
-# Test configuration
+# Test configuration (will fail until containers are running - this is expected)
 sudo nginx -t
 
-# Reload nginx
-sudo systemctl reload nginx
+# Don't reload nginx yet - wait until containers are started
 ```
+
+**Note:** System Nginx cannot resolve Docker container names. The config uses `127.0.0.1:8001` which maps to the blue container's exposed port. Nginx configuration test will fail at this stage because containers aren't running yet - this is expected.
 
 ---
 
@@ -216,6 +220,8 @@ docker-compose -f docker-compose.prod.yml logs -f
 **Note:** The `--env-file .env.production` flag is required because Docker Compose only auto-loads `.env` by default, not `.env.production`. We exclude the containerized `nginx` service since we're using the system Nginx that's already configured.
 
 **TODO:** We're starting only `app-blue` for initial deployment. The `app-green` container is experiencing health check failures and needs investigation. For now, blue-green deployments are disabled. This should be revisited once the application is stable. See [Issue: Green container health check failures](#green-container-health-check-failures).
+
+**TODO:** The `loki` container may experience restart loops during initial deployment. This is a known issue that needs investigation. Loki is used for log aggregation and is not critical for application functionality. See [Issue: Loki container restart loops](#loki-container-restart-loops).
 
 ### Step 3: Wait for services to be ready
 
@@ -527,6 +533,29 @@ docker exec logkeep-blue env
 docker exec logkeep-blue python -c "from src.utils.database import engine; engine.connect()"
 ```
 
+### Nginx cannot resolve Docker container names
+
+**Problem:** Nginx test fails with:
+```
+nginx: [emerg] host not found in upstream "logkeep-blue:8000"
+```
+
+**Cause:** System Nginx runs outside Docker and cannot resolve Docker container names. It can only connect to services on localhost.
+
+**Solution:** Use localhost ports that are mapped from the containers. Update the nginx config:
+
+```bash
+# Change from container name to localhost port
+sudo sed -i 's/server logkeep-blue:8000/server 127.0.0.1:8001/' /etc/nginx/conf.d/logkeep.conf
+
+# For blue-green deployments, green uses port 8002:
+# sudo sed -i 's/server 127.0.0.1:8001/server 127.0.0.1:8002/' /etc/nginx/conf.d/logkeep.conf
+```
+
+The docker-compose file maps:
+- Blue container: `127.0.0.1:8001` → `logkeep-blue:8000`
+- Green container: `127.0.0.1:8002` → `logkeep-green:8000`
+
 ### SSL certificate issues
 
 ```bash
@@ -617,6 +646,30 @@ docker-compose -f docker-compose.prod.yml --env-file .env.production up -d postg
 5. Verify health check timeout and retry settings are appropriate
 
 **TODO:** Re-enable green container once health check issue is resolved. Update deployment scripts to use blue-green switching mechanism.
+
+### Loki container restart loops
+
+**Problem:** The `logkeep-loki` container enters a restart loop during or after deployment.
+
+**Status:** Known issue - currently under investigation. Loki is not critical for core application functionality.
+
+**Impact:** Log aggregation and centralized logging are unavailable. Application logs can still be viewed with `docker logs logkeep-blue`. Grafana dashboards that depend on Loki data sources will not function.
+
+**Temporary workaround:** The application can run without Loki. To exclude it from startup:
+
+```bash
+docker-compose -f docker-compose.prod.yml --env-file .env.production up -d postgres app-blue prometheus grafana postgres-exporter
+```
+
+**Investigation needed:**
+1. Check Loki logs for specific error: `docker logs logkeep-loki`
+2. Verify volume permissions for Loki data directory
+3. Check Loki configuration file in `monitoring/loki-config.yml`
+4. Test if Loki can start in standalone mode
+5. Verify Loki version compatibility with Grafana version
+6. Check for port conflicts or resource constraints
+
+**TODO:** Resolve Loki restart issue to enable full logging and monitoring capabilities.
 
 ---
 
