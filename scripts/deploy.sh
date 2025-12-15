@@ -101,14 +101,14 @@ wait_for_health() {
 switch_nginx_via_symlink() {
     local new_slot=$1
     local old_slot=$2
-    local nginx_dir="./nginx"
-    local symlink_path="${nginx_dir}/logkeep.conf"
-    local new_config="${new_slot}.conf"
+    local nginx_conf_dir="/etc/nginx/conf.d"
+    local symlink_path="${nginx_conf_dir}/logkeep.conf"
+    local new_config="${nginx_conf_dir}/${new_slot}.conf"
     
     log_step "Switching nginx to $new_slot via symlink..."
     
-    # Update symlink in repo to point to new config
-    ln -sf "$new_config" "$symlink_path"
+    # Update symlink on system to point to new config
+    sudo ln -sf "$new_config" "$symlink_path"
     
     # Verify symlink was created correctly
     if [ "$(readlink $symlink_path)" != "$new_config" ]; then
@@ -116,22 +116,16 @@ switch_nginx_via_symlink() {
         return 1
     fi
     
-    # Remove old nginx container and recreate (avoids docker-compose ContainerConfig bug)
-    docker rm -f logkeep-nginx || true
-    docker-compose -f docker-compose.prod.yml --env-file .env.production up -d nginx
-    
-    # Wait for nginx to start
-    sleep 3
-    
-    # Test if nginx is responding
-    if ! docker exec logkeep-nginx nginx -t 2>/dev/null; then
+    # Test nginx configuration
+    if ! sudo nginx -t 2>/dev/null; then
         log_error "Nginx configuration test failed!"
         # Attempt to rollback
-        ln -sf "${old_slot}.conf" "$symlink_path"
-        docker rm -f logkeep-nginx || true
-        docker-compose -f docker-compose.prod.yml --env-file .env.production up -d nginx
+        sudo ln -sf "${nginx_conf_dir}/${old_slot}.conf" "$symlink_path"
         return 1
     fi
+    
+    # Reload nginx to pick up new config
+    sudo systemctl reload nginx
     
     log_info "Traffic successfully switched to $new_slot"
 }
@@ -172,14 +166,15 @@ preflight_checks() {
         exit 1
     fi
     
-    # Check nginx container
-    if ! docker ps --filter "name=logkeep-nginx" --filter "status=running" --format "{{.Names}}" | grep -q "logkeep-nginx"; then
-        log_warn "Nginx container not running - will be started during deployment"
+    # Check system nginx
+    if ! sudo systemctl is-active --quiet nginx; then
+        log_error "System nginx is not running"
+        exit 1
     fi
     
-    # Verify nginx config files exist in repo
-    if [ ! -f "./nginx/blue.conf" ] || [ ! -f "./nginx/green.conf" ]; then
-        log_error "Nginx blue/green config files not found in ./nginx/"
+    # Verify nginx config files exist in system directory
+    if [ ! -f "/etc/nginx/conf.d/blue.conf" ] || [ ! -f "/etc/nginx/conf.d/green.conf" ]; then
+        log_error "Nginx blue/green config files not found in /etc/nginx/conf.d/"
         exit 1
     fi
     

@@ -89,26 +89,9 @@ services:
       - "com.logkeep.slot=green"
       - "com.logkeep.environment=production"
 
-  # Nginx Reverse Proxy
-  nginx:
-    image: nginx:alpine
-    container_name: logkeep-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/logkeep.conf:/etc/nginx/conf.d/logkeep.conf:ro
-      - ./nginx/grafana.conf:/etc/nginx/conf.d/grafana.conf:ro
-      - ./nginx/perdrizet.conf:/etc/nginx/conf.d/perdrizet.conf:ro
-      - /etc/nginx/certs:/etc/nginx/certs:ro
-      - nginx_logs:/var/log/nginx
-    depends_on:
-      - app-blue
-    networks:
-      - logkeep-network
-    labels:
-      - "com.logkeep.service=proxy"
+  # Note: Nginx runs on the host system, not in a container
+  # Config files are in nginx/ directory and copied to /etc/nginx/conf.d/
+  # Symlink /etc/nginx/conf.d/logkeep.conf points to either blue.conf or green.conf
 
   # Prometheus Metrics Collection
   prometheus:
