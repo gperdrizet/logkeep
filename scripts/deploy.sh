@@ -22,7 +22,6 @@ NC='\033[0m'
 # Configuration
 IMAGE_TAG="${1:-latest}"
 IMAGE_NAME="gperdrizet/logkeep:${IMAGE_TAG}"
-NGINX_CONF="/etc/nginx/conf.d/logkeep.conf"
 HEALTH_CHECK_RETRIES=10
 HEALTH_CHECK_INTERVAL=5
 OBSERVATION_PERIOD=300  # 5 minutes in seconds
@@ -99,24 +98,24 @@ wait_for_health() {
     return 1
 }
 
-switch_nginx_upstream() {
+switch_traffic_via_traefik() {
     local new_slot=$1
-    local new_port=$(get_container_port "$new_slot")
+    local old_slot=$2
+    local new_container="logkeep-${new_slot}"
+    local old_container="logkeep-${old_slot}"
     
-    log_step "Switching Nginx upstream to $new_slot (port $new_port)..."
+    log_step "Switching Traefik routing to $new_slot..."
     
-    # Update Nginx config to point to new port
-    sudo sed -i "s/server 127.0.0.1:[0-9]*;/server 127.0.0.1:${new_port};/" "$NGINX_CONF"
+    # Enable routing for new container
+    docker update --label-add traefik.enable=true "$new_container"
     
-    # Test configuration
-    if ! sudo nginx -t 2>/dev/null; then
-        log_error "Nginx configuration test failed!"
-        return 1
-    fi
+    # Wait a moment for Traefik to pick up the change
+    sleep 2
     
-    # Reload Nginx
-    sudo systemctl reload nginx
-    log_info "Nginx reloaded successfully"
+    # Disable routing for old container
+    docker update --label-add traefik.enable=false "$old_container"
+    
+    log_info "Traffic successfully switched to $new_slot"
 }
 
 send_notification() {
@@ -155,9 +154,9 @@ preflight_checks() {
         exit 1
     fi
     
-    # Check Nginx (optional - warn if not available)
-    if ! command -v nginx > /dev/null 2>&1; then
-        log_warn "Nginx command not found in PATH, but may still be installed"
+    # Check if Traefik is running
+    if ! docker ps --filter "name=logkeep-traefik" --filter "status=running" --format "{{.Names}}" | grep -q "logkeep-traefik"; then
+        log_warn "Traefik container not running - traffic switching may fail"
     fi
     
     log_info "Preflight checks passed"
@@ -225,12 +224,12 @@ deploy_to_inactive_slot() {
 
 switch_traffic() {
     local new_slot=$1
-    local old_slot=$(get_active_slot)
+    local old_slot=$2
     
     log_step "Switching traffic from $old_slot to $new_slot..."
     
-    if ! switch_nginx_upstream "$new_slot"; then
-        log_error "Failed to switch Nginx upstream"
+    if ! switch_traffic_via_traefik "$new_slot" "$old_slot"; then
+        log_error "Failed to switch traffic"
         return 1
     fi
     
@@ -314,7 +313,7 @@ main() {
     
     local new_slot=$(deploy_to_inactive_slot)
     
-    switch_traffic "$new_slot"
+    switch_traffic "$new_slot" "$old_slot"
     
     observe_new_deployment "$new_slot"
     

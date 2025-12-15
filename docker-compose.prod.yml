@@ -55,6 +55,12 @@ services:
     labels:
       - "com.logkeep.slot=blue"
       - "com.logkeep.environment=production"
+      - "traefik.enable=true"
+      - "traefik.http.routers.logkeep-blue.rule=Host(`logkeep.perdrizet.org`)"
+      - "traefik.http.routers.logkeep-blue.entrypoints=websecure"
+      - "traefik.http.routers.logkeep-blue.tls=true"
+      - "traefik.http.services.logkeep-blue.loadbalancer.server.port=8000"
+      - "traefik.http.routers.logkeep-blue.priority=100"
 
   # Green Application (New Deployment Target)
   app-green:
@@ -88,21 +94,38 @@ services:
     labels:
       - "com.logkeep.slot=green"
       - "com.logkeep.environment=production"
+      - "traefik.enable=false"
+      - "traefik.http.routers.logkeep-green.rule=Host(`logkeep.perdrizet.org`)"
+      - "traefik.http.routers.logkeep-green.entrypoints=websecure"
+      - "traefik.http.routers.logkeep-green.tls=true"
+      - "traefik.http.services.logkeep-green.loadbalancer.server.port=8000"
+      - "traefik.http.routers.logkeep-green.priority=100"
 
-  # Nginx Reverse Proxy
-  nginx:
-    image: nginx:alpine
-    container_name: logkeep-nginx
+  # Traefik Reverse Proxy
+  traefik:
+    image: traefik:v2.11
+    container_name: logkeep-traefik
     restart: unless-stopped
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--log.level=INFO"
+      - "--accesslog=true"
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/logkeep.conf:/etc/nginx/conf.d/logkeep.conf:ro
-      - ./nginx/grafana.conf:/etc/nginx/conf.d/grafana.conf:ro
-      - ./nginx/perdrizet.conf:/etc/nginx/conf.d/perdrizet.conf:ro
-      - /etc/nginx/certs:/etc/nginx/certs:ro
-      - nginx_logs:/var/log/nginx
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - /etc/nginx/certs:/etc/certs:ro
+      - traefik_logs:/var/log/traefik
     depends_on:
       - app-blue
     networks:
@@ -254,4 +277,6 @@ volumes:
   loki_data:
     driver: local
   nginx_logs:
+    driver: local
+  traefik_logs:
     driver: local
