@@ -167,16 +167,20 @@ docker-compose up -d ollama
 
 ### Step 2: setup SSH tunnel
 
+**Note:** This setup uses `autossh` for a reverse SSH tunnel rather than WireGuard, as it's simpler to configure and works well for this single-purpose tunnel.
+
 ```bash
 # Run tunnel setup script
 cd /mnt/arkk/logkeep
 sudo bash scripts/setup-ssh-tunnel.sh
 ```
 
-This creates a persistent SSH tunnel that:
-- Forwards Ollama port 11434 to VPS
-- Auto-starts on boot
+This creates a persistent reverse SSH tunnel that:
+- Forwards local Ollama port 11434 to VPS port 11434
+- Uses `autossh` for automatic reconnection
+- Auto-starts on boot via systemd service
 - Auto-reconnects if connection drops
+- Monitors connection health with keepalive packets
 
 ### Step 3: verify tunnel
 
@@ -670,6 +674,25 @@ docker-compose -f docker-compose.prod.yml --env-file .env.production up -d postg
 6. Check for port conflicts or resource constraints
 
 **TODO:** Resolve Loki restart issue to enable full logging and monitoring capabilities.
+
+### Static files (CSS) not loading
+
+**Problem:** The application loads and functions correctly, but CSS styling is missing. Pages appear unstyled.
+
+**Status:** Known issue - application is functional but visual appearance is affected.
+
+**Impact:** User interface lacks styling and formatting. Application functionality (login, link submission, etc.) still works.
+
+**Investigation needed:**
+1. Verify CSS files exist in container: `docker exec logkeep-blue ls -la /app/src/static/css/`
+2. Check browser console (F12) for 404 errors on CSS file requests
+3. Verify static file route configuration in main application file
+4. Check if Nginx is properly proxying static file requests
+5. Test direct access to static files: `curl http://127.0.0.1:8001/static/css/style.css`
+6. Verify static file mounting in docker-compose volumes
+7. Check FastAPI/Starlette static file configuration
+
+**TODO:** Debug and fix static file serving to restore application styling.
 
 ---
 
