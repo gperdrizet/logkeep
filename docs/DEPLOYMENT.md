@@ -1088,7 +1088,11 @@ After successful deployment:
 5. **Invite test users:** Generate invite codes
 6. **Plan scaling:** Monitor resource usage and plan upgrades
 7. **Clean up Ionos firewall:** Remove any temporary firewall rules from Ionos admin interface now that UFW is configured on the VPS
-
+8. **Access control for monitoring dashboards**
+9. **GitHub login for VPS**
+10. **VS code remote on VPS**
+11. **DockerHub documentation**
+12. **Check app GitHub configuration**
 ---
 
 ## Support resources
