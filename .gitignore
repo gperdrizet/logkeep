@@ -79,3 +79,5 @@ prometheus_data/
 grafana_data/
 loki_data/
 nginx_logs/
+
+.nfs*

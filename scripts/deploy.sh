@@ -98,22 +98,33 @@ wait_for_health() {
     return 1
 }
 
-switch_traffic_via_traefik() {
+switch_nginx_via_symlink() {
     local new_slot=$1
-    local old_slot=$2
-    local new_container="logkeep-${new_slot}"
-    local old_container="logkeep-${old_slot}"
+    local nginx_conf_dir="/etc/nginx/conf.d"
+    local symlink_path="${nginx_conf_dir}/logkeep.conf"
+    local new_config="${nginx_conf_dir}/${new_slot}.conf"
     
-    log_step "Switching Traefik routing to $new_slot..."
+    log_step "Switching nginx to $new_slot via symlink..."
     
-    # Enable routing for new container
-    docker update --label-add traefik.enable=true "$new_container"
+    # Update symlink to point to new config
+    sudo ln -sf "$new_config" "$symlink_path"
     
-    # Wait a moment for Traefik to pick up the change
-    sleep 2
+    # Verify symlink was created correctly
+    if [ "$(readlink $symlink_path)" != "$new_config" ]; then
+        log_error "Failed to create symlink"
+        return 1
+    fi
     
-    # Disable routing for old container
-    docker update --label-add traefik.enable=false "$old_container"
+    # Test nginx configuration
+    if ! sudo nginx -t 2>/dev/null; then
+        log_error "Nginx configuration test failed!"
+        # Attempt to rollback
+        sudo ln -sf "${nginx_conf_dir}/${2}.conf" "$symlink_path"
+        return 1
+    fi
+    
+    # Reload nginx
+    sudo systemctl reload nginx
     
     log_info "Traffic successfully switched to $new_slot"
 }
@@ -154,9 +165,16 @@ preflight_checks() {
         exit 1
     fi
     
-    # Check if Traefik is running
-    if ! docker ps --filter "name=logkeep-traefik" --filter "status=running" --format "{{.Names}}" | grep -q "logkeep-traefik"; then
-        log_warn "Traefik container not running - traffic switching may fail"
+    # Check nginx
+    if ! sudo systemctl is-active --quiet nginx; then
+        log_error "Nginx is not running"
+        exit 1
+    fi
+    
+    # Verify nginx config files exist
+    if [ ! -f "/etc/nginx/conf.d/blue.conf" ] || [ ! -f "/etc/nginx/conf.d/green.conf" ]; then
+        log_error "Nginx blue/green config files not found"
+        exit 1
     fi
     
     log_info "Preflight checks passed"
@@ -228,7 +246,7 @@ switch_traffic() {
     
     log_step "Switching traffic from $old_slot to $new_slot..."
     
-    if ! switch_traffic_via_traefik "$new_slot" "$old_slot"; then
+    if ! switch_nginx_via_symlink "$new_slot" "$old_slot"; then
         log_error "Failed to switch traffic"
         return 1
     fi
