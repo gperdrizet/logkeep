@@ -22,8 +22,8 @@ NC='\033[0m'
 # Configuration
 IMAGE_TAG="${1:-latest}"
 IMAGE_NAME="gperdrizet/logkeep:${IMAGE_TAG}"
-HEALTH_CHECK_RETRIES=10
-HEALTH_CHECK_INTERVAL=5
+HEALTH_CHECK_RETRIES=15
+HEALTH_CHECK_INTERVAL=10
 OBSERVATION_PERIOD=300  # 5 minutes in seconds
 
 # =============================================================================
@@ -116,18 +116,20 @@ switch_nginx_via_symlink() {
         return 1
     fi
     
-    # Recreate nginx container to pick up new config
-    docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate --no-deps nginx
+    # Remove old nginx container and recreate (avoids docker-compose ContainerConfig bug)
+    docker rm -f logkeep-nginx || true
+    docker-compose -f docker-compose.prod.yml --env-file .env.production up -d nginx
     
     # Wait for nginx to start
-    sleep 2
+    sleep 3
     
     # Test if nginx is responding
     if ! docker exec logkeep-nginx nginx -t 2>/dev/null; then
         log_error "Nginx configuration test failed!"
         # Attempt to rollback
         ln -sf "${old_slot}.conf" "$symlink_path"
-        docker-compose -f docker-compose.prod.yml --env-file .env.production up -d --force-recreate --no-deps nginx
+        docker rm -f logkeep-nginx || true
+        docker-compose -f docker-compose.prod.yml --env-file .env.production up -d nginx
         return 1
     fi
     
