@@ -860,6 +860,45 @@ curl -I https://logkeep.perdrizet.org/static/css/style.css
 3. Update dashboard queries to match actual available metrics
 4. Test and validate all panels display data correctly
 
+### Staging environment not configured
+
+**Problem:** The CI/CD pipeline includes a "Deploy to Staging" workflow that fails because no staging environment exists.
+
+**Status:** Known limitation - staging deployment disabled for automatic runs.
+
+**Current State:**
+- Staging deployment workflow exists in `.github/workflows/deploy-staging.yml`
+- Workflow changed to manual-only (`workflow_dispatch`) to prevent automatic failures
+- No staging infrastructure deployed on VPS or elsewhere
+
+**Impact:** 
+- Cannot test deployments in staging before production
+- CI/CD pipeline only builds images; production deploys manually or on merge to `main`
+- Higher risk when deploying changes to production
+
+**TODO:** Set up proper staging environment:
+1. **Option A - VPS Staging Container:**
+   - Add staging container to `docker-compose.prod.yml` (e.g., `app-staging` on port 8003)
+   - Configure nginx reverse proxy for staging subdomain
+   - Set up separate staging database or schema
+   - Update GitHub secrets for staging deployment
+   - Re-enable automatic staging deployments on dev branch pushes
+
+2. **Option B - Separate Staging Server:**
+   - Provision separate VPS or cloud instance for staging
+   - Mirror production infrastructure at smaller scale
+   - Configure DNS for staging subdomain
+   - Set up SSH access and deployment credentials
+   - Implement staging-specific configuration
+
+3. **Option C - Local Staging:**
+   - Keep staging environment on development machine
+   - Use docker-compose for local staging tests
+   - Manual verification before pushing to production
+   - Simpler but less representative of production
+
+**Recommendation:** Option A (VPS staging container) provides good balance of cost and testing fidelity. Can share database server with different schema or use separate staging database.
+
 ### Docker Compose log streaming error
 
 **Problem:** When following container logs with `-f` flag, you may see:
