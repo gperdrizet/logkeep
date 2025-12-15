@@ -121,14 +121,16 @@ switch_nginx_via_symlink() {
     sudo ln -sf "$new_config" "$symlink_path"
     
     # Verify symlink was created correctly
-    if [ "$(readlink $symlink_path)" != "$new_config" ]; then
-        log_error "Failed to create symlink"
+    local current_link=$(sudo readlink "$symlink_path")
+    if [ "$current_link" != "$new_config" ]; then
+        log_error "Failed to create symlink (points to: $current_link, expected: $new_config)"
         return 1
     fi
     
     # Test nginx configuration
-    if ! sudo nginx -t 2>/dev/null; then
+    if ! sudo nginx -t 2>&1 | tee /tmp/nginx-test.log | grep -q "test is successful"; then
         log_error "Nginx configuration test failed!"
+        cat /tmp/nginx-test.log
         # Attempt to rollback
         sudo ln -sf "${nginx_configs_dir}/${old_slot}.conf" "$symlink_path"
         return 1
