@@ -193,9 +193,9 @@ deploy_to_inactive_slot() {
     log_info "Starting $new_container with new image..."
     
     if [ "$new_slot" = "green" ]; then
-        docker-compose -f docker-compose.prod.yml up -d app-green
+        docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app-green
     else
-        docker-compose -f docker-compose.prod.yml up -d app-blue
+        docker-compose -f docker-compose.prod.yml --env-file .env.production up -d app-blue
     fi
     
     # Wait for container to be healthy
