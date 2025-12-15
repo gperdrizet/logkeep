@@ -1093,6 +1093,7 @@ After successful deployment:
 10. **VS code remote on VPS**
 11. **DockerHub documentation**
 12. **Check app GitHub configuration**
+13. **Clean up repo**
 ---
 
 ## Support resources
