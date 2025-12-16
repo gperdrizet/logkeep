@@ -52,6 +52,8 @@ jobs:
             echo 'Deploying to staging...' && \
             docker pull gperdrizet/logkeep:${IMAGE_TAG} && \
             docker-compose -f docker-compose.staging.yml pull app-staging && \
+            docker stop logkeep-staging 2>/dev/null || true && \
+            docker rm logkeep-staging 2>/dev/null || true && \
             docker-compose -f docker-compose.staging.yml up -d app-staging && \
             echo 'Staging deployment completed!'"
 
