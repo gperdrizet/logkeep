@@ -1,6 +1,12 @@
 name: Deploy to Staging
 
 on:
+  # Auto-deploy on dev branch pushes
+  push:
+    branches:
+      - dev
+  
+  # Allow manual deployment with custom image tag
   workflow_dispatch:
     inputs:
       image_tag:

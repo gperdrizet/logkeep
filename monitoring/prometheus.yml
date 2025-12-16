@@ -6,12 +6,11 @@ global:
     cluster: 'logkeep-production'
     environment: 'production'
 
-# Alertmanager configuration (optional - for email alerts)
+# Alertmanager configuration for email alerts
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: []
-          # Add alertmanager:9093 here if you set up Alertmanager
+        - targets: ['logkeep-alertmanager:9093']
 
 # Load alert rules
 rule_files:
@@ -72,16 +71,18 @@ scrape_configs:
           slot: 'staging'
           environment: 'staging'
 
-  # Docker Container Metrics (if cAdvisor is added)
-  # - job_name: 'cadvisor'
-  #   static_configs:
-  #     - targets: ['cadvisor:8080']
-  #       labels:
-  #         service: 'cadvisor'
+  # Docker Container Metrics
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['logkeep-cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+          instance: 'vps-primary'
 
-  # Nginx Metrics (if nginx-prometheus-exporter is added)
-  # - job_name: 'nginx'
-  #   static_configs:
-  #     - targets: ['nginx-exporter:9113']
-  #       labels:
-  #         service: 'nginx'
+  # Nginx Metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['logkeep-nginx-exporter:9113']
+        labels:
+          service: 'nginx'
+          instance: 'vps-primary'

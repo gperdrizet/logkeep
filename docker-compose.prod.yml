@@ -215,6 +215,61 @@ services:
     labels:
       - "com.logkeep.service=monitoring"
 
+  # Alertmanager (Alert Routing and Email Notifications)
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: logkeep-alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - "127.0.0.1:9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.service=monitoring"
+
+  # cAdvisor (Container Resource Metrics)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: logkeep-cadvisor
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.service=monitoring"
+
+  # Nginx Prometheus Exporter
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:latest
+    container_name: logkeep-nginx-exporter
+    restart: unless-stopped
+    command:
+      - '-nginx.scrape-uri=http://host.docker.internal/nginx_status'
+    ports:
+      - "127.0.0.1:9113:9113"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.service=monitoring"
+
 networks:
   logkeep-network:
     driver: bridge
@@ -235,6 +290,8 @@ volumes:
   grafana_data:
     driver: local
   loki_data:
+    driver: local
+  alertmanager_data:
     driver: local
   nginx_logs:
     driver: local

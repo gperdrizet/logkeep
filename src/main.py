@@ -4,11 +4,12 @@ import os
 from datetime import datetime, timedelta
 from typing import Optional
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, status, BackgroundTasks
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 from src.config import settings
 from src.api import auth, links, tags, health
@@ -35,6 +36,41 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Prometheus metrics
+REQUEST_COUNT = Counter(
+    'logkeep_requests_total',
+    'Total number of requests',
+    ['method', 'endpoint', 'status']
+)
+
+REQUEST_DURATION = Histogram(
+    'logkeep_request_duration_seconds',
+    'Request duration in seconds',
+    ['method', 'endpoint']
+)
+
+LINK_SUBMISSIONS = Counter(
+    'logkeep_link_submissions_total',
+    'Total number of link submissions',
+    ['status']
+)
+
+ACTIVE_USERS = Gauge(
+    'logkeep_active_users',
+    'Number of active users'
+)
+
+PROCESSING_ERRORS = Counter(
+    'logkeep_processing_errors_total',
+    'Total number of processing errors',
+    ['error_type']
+)
+
+DB_CONNECTIONS = Gauge(
+    'logkeep_db_connections',
+    'Number of active database connections'
+)
+
 # Mount static files
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
@@ -53,11 +89,47 @@ def clean_url_display(url: str) -> str:
 
 templates.env.filters['clean_url'] = clean_url_display
 
+# Middleware for metrics
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    """Middleware to track request metrics."""
+    # Skip metrics endpoint itself
+    if request.url.path == "/metrics":
+        return await call_next(request)
+    
+    import time
+    start_time = time.time()
+    
+    response = await call_next(request)
+    
+    duration = time.time() - start_time
+    
+    # Record metrics
+    REQUEST_COUNT.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=response.status_code
+    ).inc()
+    
+    REQUEST_DURATION.labels(
+        method=request.method,
+        endpoint=request.url.path
+    ).observe(duration)
+    
+    return response
+
 # Include API routers
 app.include_router(auth.router)
 app.include_router(links.router)
 app.include_router(tags.router)
 app.include_router(health.router)
+
+
+# Metrics endpoint
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint."""
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 # Startup event - recover stale processing tasks
@@ -70,6 +142,11 @@ async def startup_event():
     db = SessionLocal()
     try:
         link_service = LinkService(db)
+        
+        # Update active users metric
+        active_user_count = db.query(User).filter(User.is_active == True).count()
+        ACTIVE_USERS.set(active_user_count)
+        logger.info(f"Active users: {active_user_count}")
         
         # Find links that have been processing for more than configured timeout
         stale_threshold = datetime.now() - timedelta(minutes=settings.processing_timeout_minutes)
@@ -484,12 +561,16 @@ async def submit_link(
         
         logger.info(f"Link submitted by {current_user.username}: {url} (ID: {link.id})")
         
+        # Track successful submission
+        LINK_SUBMISSIONS.labels(status='success').inc()
+        
         # Process in background
         background_tasks.add_task(process_link, link.id)
         
         return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
         
     except DuplicateError:
+        LINK_SUBMISSIONS.labels(status='duplicate').inc()
         return templates.TemplateResponse(
             "submit.html",
             {
@@ -501,6 +582,7 @@ async def submit_link(
             status_code=409
         )
     except ValidationError as e:
+        LINK_SUBMISSIONS.labels(status='failed').inc()
         return templates.TemplateResponse(
             "submit.html",
             {

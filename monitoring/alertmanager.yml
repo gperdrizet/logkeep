@@ -1,0 +1,78 @@
+global:
+  # SMTP configuration for email alerts
+  smtp_smarthost: '${SMTP_HOST}:${SMTP_PORT}'
+  smtp_from: '${SMTP_USER}'
+  smtp_auth_username: '${SMTP_USER}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+# Route alerts to appropriate receivers
+route:
+  receiver: 'email-alerts'
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  routes:
+    # Critical alerts - send immediately
+    - match:
+        severity: critical
+      receiver: 'email-critical'
+      repeat_interval: 4h
+    
+    # Warning alerts - batch and send less frequently
+    - match:
+        severity: warning
+      receiver: 'email-alerts'
+      repeat_interval: 12h
+
+# Receivers define where to send alerts
+receivers:
+  - name: 'email-alerts'
+    email_configs:
+      - to: '${ALERT_EMAIL}'
+        send_resolved: true
+        headers:
+          Subject: '[LogKeep Alert] {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>LogKeep Alert</h2>
+          <p><strong>Alert:</strong> {{ .GroupLabels.alertname }}</p>
+          <p><strong>Severity:</strong> {{ .CommonLabels.severity }}</p>
+          <p><strong>Environment:</strong> {{ .CommonLabels.environment }}</p>
+          {{ range .Alerts }}
+          <hr>
+          <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+          <p><strong>Summary:</strong> {{ .Annotations.summary }}</p>
+          <p><strong>Started:</strong> {{ .StartsAt }}</p>
+          {{ if .EndsAt }}<p><strong>Ended:</strong> {{ .EndsAt }}</p>{{ end }}
+          {{ end }}
+
+  - name: 'email-critical'
+    email_configs:
+      - to: '${ALERT_EMAIL}'
+        send_resolved: true
+        headers:
+          Subject: '[LogKeep CRITICAL] {{ .GroupLabels.alertname }}'
+        html: |
+          <h1 style="color: red;">CRITICAL ALERT</h1>
+          <h2>LogKeep Production Issue</h2>
+          <p><strong>Alert:</strong> {{ .GroupLabels.alertname }}</p>
+          <p><strong>Severity:</strong> CRITICAL</p>
+          <p><strong>Environment:</strong> {{ .CommonLabels.environment }}</p>
+          {{ range .Alerts }}
+          <hr>
+          <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+          <p><strong>Summary:</strong> {{ .Annotations.summary }}</p>
+          <p><strong>Started:</strong> {{ .StartsAt }}</p>
+          {{ if .EndsAt }}<p><strong>Ended:</strong> {{ .EndsAt }}</p>{{ end }}
+          {{ end }}
+          <p><strong>Action Required:</strong> Immediate investigation needed</p>
+
+# Inhibition rules to suppress alerts that are already covered by other alerts
+inhibit_rules:
+  # Suppress warning if critical alert is already firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'instance']
