@@ -61,7 +61,7 @@
 	// 4. Upgrade pip to latest version for better dependency resolution
 	// 5. Install all Python dependencies from requirements.txt to user site-packages
 	//    (--user flag avoids permission issues and keeps packages separate from system)
-	"onCreateCommand": "sudo apt update && sudo apt upgrade -y && sudo apt-get install gnupg2 -y && bash .devcontainer/install-gh.sh && pip3 install --upgrade pip && pip3 install --user -r requirements.txt",
+	"onCreateCommand": "sudo apt update && sudo apt upgrade -y && sudo apt-get install gnupg2 docker-compose -y && bash .devcontainer/install-gh.sh && pip3 install --upgrade pip && pip3 install --user -r requirements.txt",
 
 	// Use 'postCreateCommand' to run commands once after the container is created
 	"postCreateCommand": "",
