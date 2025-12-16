@@ -64,11 +64,12 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           ssh -p 44441 $VPS_USER@$VPS_HOST << 'EOF'
-            # Test health endpoint
-            if docker exec logkeep-staging curl -f http://localhost:8000/health > /dev/null 2>&1; then
+            # Test health endpoint from host
+            if curl -f http://localhost:8003/health > /dev/null 2>&1; then
               echo "[OK] Staging health check passed"
             else
               echo "[FAIL] Staging health check failed"
+              docker logs --tail 20 logkeep-staging
               exit 1
             fi
             
