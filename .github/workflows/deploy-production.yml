@@ -75,7 +75,7 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
-          ssh $VPS_USER@$VPS_HOST << 'EOF'
+          ssh -p 44441 $VPS_USER@$VPS_HOST << 'EOF'
             cd /opt/logkeep
             git fetch origin
             git reset --hard origin/main
@@ -88,7 +88,7 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
-          ssh $VPS_USER@$VPS_HOST << 'EOF'
+          ssh -p 44441 $VPS_USER@$VPS_HOST << 'EOF'
             set -e
             cd /opt/logkeep
             
@@ -105,7 +105,7 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
-          ssh $VPS_USER@$VPS_HOST << 'EOF'
+          ssh -p 44441 $VPS_USER@$VPS_HOST << 'EOF'
             # Wait for application to be ready
             sleep 10
             
@@ -149,7 +149,7 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
           echo "Attempting automatic rollback..."
-          ssh $VPS_USER@$VPS_HOST << 'EOF'
+          ssh -p 44441 $VPS_USER@$VPS_HOST << 'EOF'
             cd /opt/logkeep
             ./scripts/rollback.sh
           EOF
