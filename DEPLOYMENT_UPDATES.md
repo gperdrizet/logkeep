@@ -381,7 +381,7 @@ docker exec logkeep-postgres psql -U logkeep_admin -d logkeep_staging -c "SELECT
 cd /opt/logkeep
 
 # Copy template
-cp .env.staging.template .env.staging
+cp .env.staging.example .env.staging
 
 # Edit with appropriate values
 nano .env.staging

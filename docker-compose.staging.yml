@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Staging Application
   app-staging:
-    image: gperdrizet/logkeep:staging
+    image: gperdrizet/logkeep:dev
     container_name: logkeep-staging
     restart: unless-stopped
     env_file:
