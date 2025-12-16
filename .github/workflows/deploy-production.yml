@@ -66,7 +66,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "Host ${{ secrets.VPS_HOST }}" >> ~/.ssh/config
-          echo "  Port 44441" >> ~/.ssh/config
+          echo "  Port 4444" >> ~/.ssh/config
           echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
           echo "  UserKnownHostsFile ~/.ssh/known_hosts" >> ~/.ssh/config
 

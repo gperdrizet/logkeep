@@ -40,7 +40,7 @@ jobs:
       - name: Add VPS to known hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H -p 44441 ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to Staging
         env:
@@ -48,7 +48,7 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
-          ssh $VPS_USER@$VPS_HOST << 'EOF'
+          ssh -p 44441 $VPS_USER@$VPS_HOST << 'EOF'
             set -e
             cd /opt/logkeep
             
@@ -72,7 +72,7 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
-          ssh $VPS_USER@$VPS_HOST << 'EOF'
+          ssh -p 44441 $VPS_USER@$VPS_HOST << 'EOF'
             # Test health endpoint
             if docker exec logkeep-staging curl -f http://localhost:8000/health > /dev/null 2>&1; then
               echo "[OK] Staging health check passed"
