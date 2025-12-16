@@ -1,10 +1,11 @@
 name: Deploy to Staging
 
 on:
-  # Auto-deploy on dev branch pushes
-  push:
+  # Auto-deploy on pull request to dev branch
+  pull_request:
     branches:
       - dev
+    types: [opened, synchronize, reopened]
   
   # Allow manual deployment with custom image tag
   workflow_dispatch:
