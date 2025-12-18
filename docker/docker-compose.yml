@@ -2,11 +2,11 @@ version: '3.8'
 
 secrets:
   postgres_db:
-    file: ./secrets/postgres_db.txt
+    file: ../secrets/postgres_db.txt
   postgres_user:
-    file: ./secrets/postgres_user.txt
+    file: ../secrets/postgres_user.txt
   postgres_password:
-    file: ./secrets/postgres_password.txt
+    file: ../secrets/postgres_password.txt
 
 services:
   postgres:
@@ -14,7 +14,7 @@ services:
     container_name: logkeep-postgres
     restart: unless-stopped
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data
+      - ../postgres_data:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB_FILE=/run/secrets/postgres_db
       - POSTGRES_USER_FILE=/run/secrets/postgres_user
@@ -37,8 +37,8 @@ services:
     ports:
       - "11434:11434"
     volumes:
-      - ./ollama_models:/root/.ollama
-      - ./scripts:/scripts:ro
+      - ../ollama_models:/root/.ollama
+      - ../scripts:/scripts:ro
     environment:
       - OLLAMA_NUM_GPU=1
       - OLLAMA_KEEP_ALIVE=-1
@@ -59,14 +59,14 @@ services:
     entrypoint: ["/scripts/ollama-entrypoint.sh"]
 
   app:
-    build: .
+    build: ..
     container_name: logkeep
     restart: always
     ports:
       - "8000:8000"
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
+      - ../data:/app/data
+      - ../logs:/app/logs
     env_file:
       - .env
     secrets:

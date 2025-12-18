@@ -1,4 +1,7 @@
 # LogKeep
+[![Build and Push Docker Image](https://github.com/gperdrizet/logkeep/actions/workflows/build-and-push.yml/badge.svg)](https://github.com/gperdrizet/logkeep/actions/workflows/build-and-push.yml)
+[![Deploy to Staging](https://github.com/gperdrizet/logkeep/actions/workflows/deploy-staging.yml/badge.svg)](https://github.com/gperdrizet/logkeep/actions/workflows/deploy-staging.yml)
+[![Deploy to Production](https://github.com/gperdrizet/logkeep/actions/workflows/deploy-production.yml/badge.svg)](https://github.com/gperdrizet/logkeep/actions/workflows/deploy-production.yml)
 
 Self-hosted link curation with AI summarization for Logseq
 
