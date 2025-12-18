@@ -128,7 +128,7 @@ list-invites --unused                # Show available invites
 
 ```
 ┌──────────┐
-│  Mobile  │ → FastAPI (async) → PostgreSQL
+│  Mobile  │ → FastAPI (async) → PostgreSQL (link, tags, score)
 │ Browser  │    ↓         ↓
 └──────────┘    │         └→ BackgroundTasks
                 │              ↓
@@ -136,7 +136,11 @@ list-invites --unused                # Show available invites
                 │              ↓
                 │         Summarization (Ollama/GPU)
                 │              ↓
-                └────────→ GitHub API commit
+                │         PostgreSQL
+                │              ↓
+                └────────→ GitHub API commit (optional)
+                           |
+                           └→ LogSeq journal (link, title, tags, score)
 ```
 
 - **Stack**: FastAPI, SQLAlchemy, PostgreSQL, Jinja2, Ollama, Docker
