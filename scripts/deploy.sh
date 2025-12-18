@@ -353,6 +353,10 @@ main() {
         log_warn "No active deployment found. Bootstrapping initial deployment..."
         pull_new_image
         
+        # Clean up any stopped containers first
+        log_step "Cleaning up any existing stopped containers..."
+        docker-compose --project-directory . -f docker/docker-compose.prod.yml down --remove-orphans
+        
         # Start blue container as initial deployment
         log_step "Starting initial blue container..."
         docker-compose --project-directory . -f docker/docker-compose.prod.yml up -d app-blue postgres prometheus grafana loki alertmanager promtail
