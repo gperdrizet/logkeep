@@ -357,6 +357,14 @@ main() {
         log_step "Cleaning up any existing stopped containers..."
         docker-compose --project-directory . -f docker/docker-compose.prod.yml down --remove-orphans
         
+        # Force remove any lingering containers by name
+        for container in logkeep-blue logkeep-green logkeep-postgres logkeep-prometheus logkeep-grafana logkeep-loki logkeep-alertmanager logkeep-promtail; do
+            if docker ps -a --format '{{.Names}}' | grep -q "^${container}$"; then
+                log_info "Removing container: $container"
+                docker rm -f "$container" 2>/dev/null || true
+            fi
+        done
+        
         # Start blue container as initial deployment
         log_step "Starting initial blue container..."
         docker-compose --project-directory . -f docker/docker-compose.prod.yml up -d app-blue postgres prometheus grafana loki alertmanager promtail
