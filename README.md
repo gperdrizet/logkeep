@@ -16,6 +16,7 @@ LogKeep helps you capture web content from your phone and automatically adds it 
 - **Analytics** - Score and tag usage histograms
 - **Admin CLI** - User, invite, and tag management
 - **Blue/Green Deployment** - Zero-downtime deployments with automated health checks
+- **CI/CD Pipeline** - Automated staging and production deployments via GitHub Actions
 
 ## Quick Start
 
@@ -150,6 +151,101 @@ list-invites --unused                # Show available invites
 ```
 
 Entries append to `journals/YYYY_MM_DD.md` with optional score (0.0-1.0).
+
+## CI/CD Workflow
+
+LogKeep uses a two-environment deployment strategy with automated pipelines:
+
+### Branch Strategy
+
+- **`dev`** → Staging environment (`staging.perdrizet.org`)
+- **`main`** → Production environment (`logkeep.perdrizet.org`)
+
+### Automated Deployments
+
+**Staging Deployment** (on push to `dev`):
+1. Build Docker image with `dev` tag
+2. Push to Docker Hub and GitHub Container Registry
+3. SSH to VPS and deploy to staging container (port 8003)
+4. Run smoke tests (health check + database connectivity)
+5. Accessible at `https://staging.perdrizet.org` (basic auth protected)
+
+**Production Deployment** (on push to `main`):
+1. Build Docker image with `latest` and SHA tags
+2. Push to registries
+3. Blue/green deployment:
+   - Deploy to inactive slot (blue or green)
+   - Health check validation
+   - Nginx traffic switch
+   - Keep old version running for 5 minutes (rollback capability)
+   - Clean up old container
+4. Accessible at `https://logkeep.perdrizet.org`
+
+### Manual Deployments
+
+Workflows can be manually triggered with custom image tags:
+
+```bash
+# Via GitHub Actions UI:
+# Actions → Deploy to Staging/Production → Run workflow → Select tag
+```
+
+### Required GitHub Secrets
+
+Configure in **Settings → Secrets and variables → Actions**:
+
+- `DOCKER_USERNAME` - Docker Hub username
+- `DOCKER_PASSWORD` - Docker Hub access token
+- `VPS_HOST` - VPS hostname or IP
+- `VPS_USER` - SSH username
+- `VPS_SSH_PRIVATE_KEY` - SSH private key for deployment access
+
+See [docs/GITHUB_SECRETS.md](docs/GITHUB_SECRETS.md) for detailed setup.
+
+### Development Workflow
+
+1. **Create feature branch from dev:**
+   ```bash
+   git checkout dev
+   git pull origin dev
+   git checkout -b feature/my-feature
+   ```
+
+2. **Develop and test locally:**
+   ```bash
+   docker-compose up -d
+   # Make changes, test locally
+   ```
+
+3. **Push to dev for staging deployment:**
+   ```bash
+   git checkout dev
+   git merge feature/my-feature
+   git push origin dev
+   # GitHub Actions automatically deploys to staging
+   ```
+
+4. **Test on staging:**
+   - Visit `https://staging.perdrizet.org`
+   - Verify changes work as expected
+
+5. **Deploy to production:**
+   ```bash
+   git checkout main
+   git merge dev
+   git push origin main
+   # GitHub Actions automatically deploys to production
+   ```
+
+### Rollback
+
+If a deployment fails or causes issues:
+
+**Staging**: Fix and push to `dev` (overwrites previous)
+
+**Production**: 
+- Automatic rollback on health check failure
+- Manual rollback: `ssh vps "cd /opt/logkeep && ./scripts/rollback.sh"`
 
 ## Development
 

@@ -30,6 +30,7 @@ services:
 
 networks:
   logkeep-network:
+    name: logkeep_logkeep-network
     external: true  # Uses the network created by docker-compose.prod.yml
 
 volumes:

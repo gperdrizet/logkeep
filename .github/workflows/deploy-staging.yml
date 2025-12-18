@@ -1,10 +1,11 @@
 name: Deploy to Staging
 
 on:
-  # Auto-deploy on dev branch pushes
-  push:
+  # Auto-deploy on pull request to main branch (for testing before production)
+  pull_request:
     branches:
-      - dev
+      - main
+    types: [opened, synchronize, reopened]
   
   # Allow manual deployment with custom image tag
   workflow_dispatch:
@@ -40,7 +41,7 @@ jobs:
       - name: Add VPS to known hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H -p 44441 ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to Staging
         env:
@@ -48,21 +49,12 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
         run: |
-          ssh $VPS_USER@$VPS_HOST << 'EOF'
-            set -e
-            cd /opt/logkeep
-            
-            echo "Deploying to staging..."
-            
-            # Pull new image
-            docker pull gperdrizet/logkeep:$IMAGE_TAG
-            
-            # Update staging container
-            docker-compose -f docker-compose.staging.yml pull app-staging
-            docker-compose -f docker-compose.staging.yml up -d app-staging
-            
-            echo "Staging deployment completed!"
-          EOF
+          ssh -p 44441 $VPS_USER@$VPS_HOST "cd /opt/logkeep && \
+            echo 'Deploying to staging...' && \
+            docker pull gperdrizet/logkeep:${IMAGE_TAG} && \
+            docker-compose -f docker-compose.staging.yml down && \
+            docker-compose -f docker-compose.staging.yml up -d && \
+            echo 'Staging deployment completed!'"
 
       - name: Wait for staging to be ready
         run: sleep 15
@@ -72,12 +64,13 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
         run: |
-          ssh $VPS_USER@$VPS_HOST << 'EOF'
-            # Test health endpoint
-            if docker exec logkeep-staging curl -f http://localhost:8000/health > /dev/null 2>&1; then
+          ssh -p 44441 $VPS_USER@$VPS_HOST << 'EOF'
+            # Test health endpoint from host
+            if curl -f http://localhost:8003/health > /dev/null 2>&1; then
               echo "[OK] Staging health check passed"
             else
               echo "[FAIL] Staging health check failed"
+              docker logs --tail 20 logkeep-staging
               exit 1
             fi
             
