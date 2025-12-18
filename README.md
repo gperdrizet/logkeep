@@ -3,7 +3,7 @@
 [![Deploy to Staging](https://github.com/gperdrizet/logkeep/actions/workflows/deploy-staging.yml/badge.svg)](https://github.com/gperdrizet/logkeep/actions/workflows/deploy-staging.yml)
 [![Deploy to Production](https://github.com/gperdrizet/logkeep/actions/workflows/deploy-production.yml/badge.svg)](https://github.com/gperdrizet/logkeep/actions/workflows/deploy-production.yml)
 
-Self-hosted link curation with AI summarization for Logseq.
+Self-hosted link curation with AI summarization and LogSeq integration via GitHub.
 
 ## Overview
 
