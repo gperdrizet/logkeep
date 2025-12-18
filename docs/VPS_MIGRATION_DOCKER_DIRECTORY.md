@@ -35,6 +35,19 @@
 └── ...
 ```
 
+## Prerequisites
+
+Before starting migration, ensure `make` is installed:
+
+```bash
+# Check if make is installed
+which make
+
+# If not installed, install it
+sudo apt update
+sudo apt install make -y
+```
+
 ## Migration Steps
 
 ### Step 1: Stop All Services

@@ -229,7 +229,7 @@ deploy_to_inactive_slot() {
     # For in-place update, just restart with new image
     if [ "$new_slot" = "$active_slot" ]; then
         log_info "Performing in-place update of $new_container..."
-        docker-compose --project-directory . -f docker/docker-compose.prod.yml --env-file docker/.env.production up -d --no-deps app-blue >&2
+        docker-compose --project-directory . -f docker/docker-compose.prod.yml up -d --no-deps app-blue >&2
     else
         # Stop the inactive container if it's running
         if docker ps -a --filter "name=$new_container" --format "{{.Names}}" | grep -q "$new_container"; then
@@ -242,9 +242,9 @@ deploy_to_inactive_slot() {
         log_info "Starting $new_container with new image..."
         
         if [ "$new_slot" = "green" ]; then
-            docker-compose --project-directory . -f docker/docker-compose.prod.yml --env-file docker/.env.production up -d app-green >&2
+            docker-compose --project-directory . -f docker/docker-compose.prod.yml up -d app-green >&2
         else
-            docker-compose --project-directory . -f docker/docker-compose.prod.yml --env-file docker/.env.production up -d app-blue >&2
+            docker-compose --project-directory . -f docker/docker-compose.prod.yml up -d app-blue >&2
         fi
     fi
     
