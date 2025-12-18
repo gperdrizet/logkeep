@@ -196,6 +196,14 @@ preflight_checks() {
         exit 1
     fi
     
+    # Check monitoring configuration files
+    for file in monitoring/prometheus.yml monitoring/alert-rules.yml monitoring/loki-config.yml monitoring/promtail-config.yml monitoring/alertmanager.yml; do
+        if [ ! -f "$file" ]; then
+            log_error "Required monitoring file not found: $file"
+            exit 1
+        fi
+    done
+    
     log_info "Preflight checks passed"
 }
 
