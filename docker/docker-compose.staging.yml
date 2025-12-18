@@ -7,7 +7,7 @@ services:
     container_name: logkeep-staging
     restart: unless-stopped
     env_file:
-      - .env.staging
+      - docker/.env.staging
     environment:
       - GUNICORN_WORKERS=4
       - LOG_LEVEL=debug
