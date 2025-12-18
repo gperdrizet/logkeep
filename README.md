@@ -139,13 +139,10 @@ list-invites --unused                # Show available invites
                 └────────→ GitHub API commit
 ```
 
-**Stack**: FastAPI, SQLAlchemy, SQLite, Jinja2, Ollama, Docker
-
-**Models**: User, Link, Tag, Invite (normalized many-to-many)
-
-**Processing**: Async background tasks with retry logic, status tracking
-
-**Security**: Bcrypt passwords, Fernet-encrypted GitHub tokens, JWT sessions
+- **Stack**: FastAPI, SQLAlchemy, SQLite, Jinja2, Ollama, Docker
+- **Models**: User, Link, Tag, Invite (normalized many-to-many)
+- **Processing**: Async background tasks with retry logic, status tracking
+- **Security**: Bcrypt passwords, Fernet-encrypted GitHub tokens, JWT sessions
 
 ## Logseq Entry Format
 
