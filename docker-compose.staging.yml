@@ -9,7 +9,6 @@ services:
     env_file:
       - .env.staging
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/logkeep_staging
       - GUNICORN_WORKERS=4
       - LOG_LEVEL=debug
     ports:
