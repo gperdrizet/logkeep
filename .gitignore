@@ -24,13 +24,17 @@ share/python-wheels/
 MANIFEST
 
 # Virtual Environment
-.env
 .venv
 env/
 venv/
 ENV/
 env.bak/
 venv.bak/
+
+# Docker environment files (secrets should not be committed)
+docker/.env
+docker/.env.staging
+docker/.env.production
 
 # IDEs
 .vscode/
