@@ -350,8 +350,35 @@ main() {
     
     local old_slot=$(get_active_slot)
     if [ "$old_slot" = "none" ]; then
-        log_error "No active deployment found. Use docker-compose up instead."
-        exit 1
+        log_warn "No active deployment found. Bootstrapping initial deployment..."
+        pull_new_image
+        
+        # Start blue container as initial deployment
+        log_step "Starting initial blue container..."
+        docker-compose --project-directory . -f docker/docker-compose.prod.yml up -d app-blue postgres prometheus grafana loki alertmanager promtail
+        
+        if ! wait_for_health "logkeep-blue"; then
+            log_error "Initial deployment failed health checks"
+            exit 1
+        fi
+        
+        log_info "Initial blue deployment successful!"
+        
+        # Setup nginx symlink to blue
+        local nginx_configs_dir="/etc/nginx/logkeep-configs"
+        local nginx_conf_dir="/etc/nginx/conf.d"
+        local symlink_path="${nginx_conf_dir}/logkeep.conf"
+        local blue_config="${nginx_configs_dir}/blue.conf"
+        
+        log_step "Setting up nginx to point to blue..."
+        sudo ln -sf "$blue_config" "$symlink_path"
+        sudo nginx -t && sudo systemctl reload nginx
+        
+        log_info "=========================================="
+        log_info "Initial deployment completed successfully!"
+        log_info "Active slot: blue"
+        log_info "=========================================="
+        exit 0
     fi
     
     pull_new_image
