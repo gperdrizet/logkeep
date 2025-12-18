@@ -7,7 +7,7 @@ Link curation with AI summarization and LogSeq integration via GitHub.
 
 ## Overview
 
-LogKeep helps you capture web content from your phone and automatically adds it to your Logseq knowledge graph. Submit a link, select tags, and the system extracts the title, generates an AI summary, and commits a formatted entry to your GitHub-hosted journal. No manual typing of titles or copy-pasting required.
+LogKeep helps you capture and curate web content from your phone. Submit a link, select tags, and the system extracts the title, generates an AI summary, and commits a formatted entry to your GitHub-hosted journal. No manual typing of titles or copy-pasting required. LogKeep can also add extracted content to your LogSeq graph via a GitHub repository.
 
 ## Features
 
