@@ -53,8 +53,8 @@ jobs:
             echo 'Deploying to staging...' && \
             docker pull gperdrizet/logkeep:${IMAGE_TAG} && \
             cd docker && \
-            docker-compose -f docker-compose.staging.yml down && \
-            docker-compose -f docker-compose.staging.yml up -d && \
+            docker-compose --project-directory .. -f docker-compose.staging.yml down && \
+            docker-compose --project-directory .. -f docker-compose.staging.yml up -d && \
             echo 'Staging deployment completed!'"
 
       - name: Wait for staging to be ready
