@@ -77,18 +77,18 @@ dev-shell:
 
 staging:
 	@echo "🚀 Starting staging environment..."
-	docker-compose --env-file $(DOCKER_DIR)/.env.staging -f $(DOCKER_DIR)/docker-compose.staging.yml up -d
+	docker-compose -p logkeep --env-file $(DOCKER_DIR)/.env.staging -f $(DOCKER_DIR)/docker-compose.staging.yml up -d
 	@sleep 5
 	@echo "✅ Staging environment running"
 	@echo "   App:      http://localhost:8003"
 	@echo "   Access:   https://staging.perdrizet.org (basic auth required)"
 
 staging-logs:
-	docker-compose --env-file $(DOCKER_DIR)/.env.staging -f $(DOCKER_DIR)/docker-compose.staging.yml logs -f
+	docker-compose -p logkeep --env-file $(DOCKER_DIR)/.env.staging -f $(DOCKER_DIR)/docker-compose.staging.yml logs -f
 
 staging-down:
 	@echo "🛑 Stopping staging environment..."
-	docker-compose --env-file $(DOCKER_DIR)/.env.staging -f $(DOCKER_DIR)/docker-compose.staging.yml down
+	docker-compose -p logkeep --env-file $(DOCKER_DIR)/.env.staging -f $(DOCKER_DIR)/docker-compose.staging.yml down
 	@echo "✅ Staging environment stopped"
 
 staging-shell:
@@ -101,7 +101,7 @@ staging-shell:
 
 prod:
 	@echo "🚀 Starting production environment..."
-	docker-compose --env-file $(DOCKER_DIR)/.env.production -f $(DOCKER_DIR)/docker-compose.prod.yml up -d
+	docker-compose -p logkeep --env-file $(DOCKER_DIR)/.env.production -f $(DOCKER_DIR)/docker-compose.prod.yml up -d
 	@echo "✅ Production environment running"
 	@echo "   Blue:     http://localhost:8001"
 	@echo "   Green:    http://localhost:8002"
@@ -109,11 +109,11 @@ prod:
 	@echo "   Grafana:  https://grafana.perdrizet.org"
 
 prod-logs:
-	docker-compose --env-file $(DOCKER_DIR)/.env.production -f $(DOCKER_DIR)/docker-compose.prod.yml logs -f app-blue app-green
+	docker-compose -p logkeep --env-file $(DOCKER_DIR)/.env.production -f $(DOCKER_DIR)/docker-compose.prod.yml logs -f app-blue app-green
 
 prod-down:
 	@echo "🛑 Stopping production environment..."
-	docker-compose --env-file $(DOCKER_DIR)/.env.production -f $(DOCKER_DIR)/docker-compose.prod.yml down
+	docker-compose -p logkeep --env-file $(DOCKER_DIR)/.env.production -f $(DOCKER_DIR)/docker-compose.prod.yml down
 	@echo "✅ Production environment stopped"
 
 prod-blue-logs:
