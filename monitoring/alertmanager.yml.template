@@ -1,11 +1,11 @@
 global:
   # SMTP configuration for email alerts
-  # Port 465 uses implicit TLS (not STARTTLS), so require_tls must be false
+  # Port 587 uses STARTTLS
   smtp_smarthost: '${SMTP_HOST}:${SMTP_PORT}'
   smtp_from: '${SMTP_USER}'
   smtp_auth_username: '${SMTP_USER}'
   smtp_auth_password: '${SMTP_PASSWORD}'
-  smtp_require_tls: false
+  smtp_require_tls: true
 
 # Route alerts to appropriate receivers
 route:
