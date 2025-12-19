@@ -47,24 +47,24 @@ help:
 
 dev:
 	@echo "🚀 Starting development environment..."
-	cd $(DOCKER_DIR) && docker-compose --project-directory .. up -d
+	docker-compose -f $(DOCKER_DIR)/docker-compose.yml up -d
 	@echo "✅ Development environment running"
 	@echo "   App:      http://localhost:8000"
 	@echo "   Postgres: localhost:5432"
 	@echo "   Ollama:   http://localhost:11434"
 
 dev-logs:
-	cd $(DOCKER_DIR) && docker-compose --project-directory .. logs -f
+	docker-compose -f $(DOCKER_DIR)/docker-compose.yml logs -f
 
 dev-down:
 	@echo "🛑 Stopping development environment..."
-	cd $(DOCKER_DIR) && docker-compose --project-directory .. down
+	docker-compose -f $(DOCKER_DIR)/docker-compose.yml down
 	@echo "✅ Development environment stopped"
 
 dev-rebuild:
 	@echo "🔨 Rebuilding development environment..."
-	cd $(DOCKER_DIR) && docker-compose --project-directory .. build --no-cache
-	cd $(DOCKER_DIR) && docker-compose --project-directory .. up -d
+	docker-compose -f $(DOCKER_DIR)/docker-compose.yml build --no-cache
+	docker-compose -f $(DOCKER_DIR)/docker-compose.yml up -d
 	@echo "✅ Development environment rebuilt and running"
 
 dev-shell:
@@ -77,18 +77,18 @@ dev-shell:
 
 staging:
 	@echo "🚀 Starting staging environment..."
-	cd $(DOCKER_DIR) && docker-compose --project-directory .. -f docker-compose.staging.yml up -d
+	docker-compose -f $(DOCKER_DIR)/docker-compose.staging.yml up -d
 	@sleep 5
 	@echo "✅ Staging environment running"
 	@echo "   App:      http://localhost:8003"
 	@echo "   Access:   https://staging.perdrizet.org (basic auth required)"
 
 staging-logs:
-	cd $(DOCKER_DIR) && docker-compose --project-directory .. -f docker-compose.staging.yml logs -f
+	docker-compose -f $(DOCKER_DIR)/docker-compose.staging.yml logs -f
 
 staging-down:
 	@echo "🛑 Stopping staging environment..."
-	cd $(DOCKER_DIR) && docker-compose --project-directory .. -f docker-compose.staging.yml down
+	docker-compose -f $(DOCKER_DIR)/docker-compose.staging.yml down
 	@echo "✅ Staging environment stopped"
 
 staging-shell:
@@ -101,7 +101,7 @@ staging-shell:
 
 prod:
 	@echo "🚀 Starting production environment..."
-	cd $(DOCKER_DIR) && docker-compose --project-directory .. -f docker-compose.prod.yml up -d
+	docker-compose -f $(DOCKER_DIR)/docker-compose.prod.yml up -d
 	@echo "✅ Production environment running"
 	@echo "   Blue:     http://localhost:8001"
 	@echo "   Green:    http://localhost:8002"
@@ -109,11 +109,11 @@ prod:
 	@echo "   Grafana:  https://grafana.perdrizet.org"
 
 prod-logs:
-	cd $(DOCKER_DIR) && docker-compose --project-directory .. -f docker-compose.prod.yml logs -f app-blue app-green
+	docker-compose -f $(DOCKER_DIR)/docker-compose.prod.yml logs -f app-blue app-green
 
 prod-down:
 	@echo "🛑 Stopping production environment..."
-	cd $(DOCKER_DIR) && docker-compose --project-directory .. -f docker-compose.prod.yml down
+	docker-compose -f $(DOCKER_DIR)/docker-compose.prod.yml down
 	@echo "✅ Production environment stopped"
 
 prod-blue-logs:
