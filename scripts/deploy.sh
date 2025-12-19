@@ -237,7 +237,7 @@ deploy_to_inactive_slot() {
     # For in-place update, just restart with new image
     if [ "$new_slot" = "$active_slot" ]; then
         log_info "Performing in-place update of $new_container..."
-        cd docker && docker-compose --project-directory .. -f docker-compose.prod.yml up -d --no-deps app-blue >&2 && cd ..
+        docker-compose -f docker/docker-compose.prod.yml up -d --no-deps app-blue >&2
     else
         # Stop the inactive container if it's running
         if docker ps -a --filter "name=$new_container" --format "{{.Names}}" | grep -q "$new_container"; then
@@ -250,9 +250,9 @@ deploy_to_inactive_slot() {
         log_info "Starting $new_container with new image..."
         
         if [ "$new_slot" = "green" ]; then
-            cd docker && docker-compose --project-directory .. -f docker-compose.prod.yml up -d app-green >&2 && cd ..
+            docker-compose -f docker/docker-compose.prod.yml up -d app-green >&2
         else
-            cd docker && docker-compose --project-directory .. -f docker-compose.prod.yml up -d app-blue >&2 && cd ..
+            docker-compose -f docker/docker-compose.prod.yml up -d app-blue >&2
         fi
     fi
     
@@ -363,7 +363,7 @@ main() {
         
         # Clean up any stopped containers first
         log_step "Cleaning up any existing stopped containers..."
-        cd docker && docker-compose --project-directory .. -f docker-compose.prod.yml down --remove-orphans && cd ..
+        docker-compose -f docker/docker-compose.prod.yml down --remove-orphans
         
         # Force remove any lingering containers by name
         for container in logkeep-blue logkeep-green logkeep-postgres logkeep-prometheus logkeep-grafana logkeep-loki logkeep-alertmanager logkeep-promtail; do
@@ -375,7 +375,7 @@ main() {
         
         # Start blue container as initial deployment
         log_step "Starting initial blue container..."
-        cd docker && docker-compose --project-directory .. -f docker-compose.prod.yml up -d app-blue postgres prometheus grafana loki alertmanager promtail && cd ..
+        docker-compose -f docker/docker-compose.prod.yml up -d app-blue postgres prometheus grafana loki alertmanager promtail
         
         if ! wait_for_health "logkeep-blue"; then
             log_error "Initial deployment failed health checks"
