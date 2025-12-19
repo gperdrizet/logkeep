@@ -266,6 +266,7 @@ Project structure:
 src/
 ├── api/          # FastAPI routes
 ├── cli/          # Admin commands
+├── docker/       # Docker compose and environment files
 ├── models/       # SQLAlchemy models
 ├── services/     # Business logic (GitHub, LLM, processing)
 ├── templates/    # Jinja2 HTML
