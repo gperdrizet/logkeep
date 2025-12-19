@@ -89,7 +89,7 @@ ENCRYPTION_KEY=<Fernet key>
 LLM_ENABLED=true
 LLM_BASE_URL=http://ollama:11434
 LLM_MODEL_NAME=hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF
-LLM_TIMEOUT=90
+LLM_TIMEOUT=180
 SUMMARIZE_ON_SUBMIT=true
 
 # Limits
