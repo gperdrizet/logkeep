@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from src.models.user import User
 from src.models.invite import Invite
 from src.utils.database import get_db
+from src.metrics import ACTIVE_USERS
 from src.utils.auth import (
     verify_password,
     get_password_hash,
@@ -184,6 +185,9 @@ async def login(
     
     logger.info(f"User logged in: {user.username}")
     
+    # Increment active users metric
+    ACTIVE_USERS.inc()
+    
     return {"message": "Login successful", "username": user.username}
 
 
@@ -199,6 +203,10 @@ async def logout(response: Response):
         Success message
     """
     response.delete_cookie(key="session")
+    
+    # Decrement active users metric
+    ACTIVE_USERS.dec()
+    
     return {"message": "Logout successful"}
 
 

@@ -9,9 +9,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 
 from src.config import settings
+from src.metrics import REQUEST_COUNT, REQUEST_DURATION, LINK_SUBMISSIONS, ACTIVE_USERS, PROCESSING_ERRORS, DB_CONNECTIONS
 from src.api import auth, links, tags, health
 from src.services.analytics import AnalyticsService
 from src.services.link_service import LinkService
@@ -34,41 +35,6 @@ app = FastAPI(
     title="LogKeep",
     description="Curate content from links using Logseq & GitHub",
     version="1.0.0"
-)
-
-# Prometheus metrics
-REQUEST_COUNT = Counter(
-    'logkeep_requests_total',
-    'Total number of requests',
-    ['method', 'endpoint', 'status']
-)
-
-REQUEST_DURATION = Histogram(
-    'logkeep_request_duration_seconds',
-    'Request duration in seconds',
-    ['method', 'endpoint']
-)
-
-LINK_SUBMISSIONS = Counter(
-    'logkeep_link_submissions_total',
-    'Total number of link submissions',
-    ['status']
-)
-
-ACTIVE_USERS = Gauge(
-    'logkeep_active_users',
-    'Number of active users'
-)
-
-PROCESSING_ERRORS = Counter(
-    'logkeep_processing_errors_total',
-    'Total number of processing errors',
-    ['error_type']
-)
-
-DB_CONNECTIONS = Gauge(
-    'logkeep_db_connections',
-    'Number of active database connections'
 )
 
 # Mount static files
@@ -143,10 +109,9 @@ async def startup_event():
     try:
         link_service = LinkService(db)
         
-        # Update active users metric
-        active_user_count = db.query(User).filter(User.is_active == True).count()
-        ACTIVE_USERS.set(active_user_count)
-        logger.info(f"Active users: {active_user_count}")
+        # Initialize active users metric to 0 (will increment on login)
+        ACTIVE_USERS.set(0)
+        logger.info("Active users metric initialized to 0")
         
         # Find links that have been processing for more than configured timeout
         stale_threshold = datetime.now() - timedelta(minutes=settings.processing_timeout_minutes)
