@@ -36,17 +36,17 @@ LogKeep helps you capture and curate web content from your phone. Submit a link,
 # Clone and configure
 git clone https://github.com/gperdrizet/logkeep.git
 cd logkeep
-cp .env.example .env
+cp docker/.env.example docker/.env
 
 # Generate secrets
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # ENCRYPTION_KEY
 python -c "import secrets; print(secrets.token_urlsafe(32))"  # SESSION_SECRET
 
-# Edit .env with secrets and LLM settings (LLM_ENABLED=true for summarization)
-nano .env
+# Edit docker/.env with secrets and LLM settings (LLM_ENABLED=true for summarization)
+nano docker/.env
 
 # Start services
-docker-compose up -d
+make dev
 
 # Initialize
 docker exec -it logkeep python -m src.cli.admin init-db
@@ -69,7 +69,7 @@ curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.li
 sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
 sudo systemctl restart docker
 
-# Enable in .env
+# Enable in docker/.env
 LLM_ENABLED=true
 LLM_BASE_URL=http://ollama:11434
 ```
@@ -78,7 +78,7 @@ The Ollama container will download the model (~807MB) on first start.
 
 ## Configuration
 
-Key environment variables (`.env`):
+Key environment variables (`docker/.env`):
 
 ```bash
 # Required
@@ -97,7 +97,7 @@ MAX_TAGS_PER_USER=1000
 MAX_RETRIES=3
 ```
 
-See `.env.example` for full configuration options.
+See `docker/.env.example` for full configuration options.
 
 ## CLI Commands
 
@@ -256,9 +256,35 @@ If a deployment fails or causes issues:
 Live-reload enabled via `docker-compose.override.yml`:
 
 ```bash
+# Start development environment
+make dev
+
+# View logs
+make logs
+
+# Check running containers
+make ps
+
+# Stop development environment
+make clean
+
 # Edit src/ files → uvicorn auto-reloads
 # Edit templates/static → changes immediate
-docker-compose logs -f  # Watch logs
+```
+
+### Available Make Commands
+
+```bash
+make dev          # Start local development environment
+make staging      # Start staging environment
+make prod         # Start production environment
+make logs         # View logs for dev environment
+make staging-logs # View logs for staging
+make prod-logs    # View logs for production
+make ps           # List running containers
+make health       # Check health endpoints
+make clean        # Stop and remove dev containers
+make help         # Show all available commands
 ```
 
 Project structure:
@@ -283,11 +309,16 @@ docker exec -it logkeep python -m src.cli.admin test-github <username>
 # View failed links
 docker exec -it logkeep python -m src.cli.admin view-failed-links --username <user>
 
+# Check health status
+make health
+
+# View logs
+make logs              # Development
+make staging-logs      # Staging
+make prod-logs         # Production
+
 # Check Ollama status (if enabled)
 docker logs -f logkeep-ollama
-
-# App logs
-docker logs -f logkeep
 ```
 
 ## License
