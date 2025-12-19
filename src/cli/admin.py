@@ -18,6 +18,7 @@ from src.models.invite import Invite
 from src.models.link import Link
 from src.models import LinkStatus
 from src.services.github import test_github_connection
+from src.metrics import SUMMARIZATION_DURATION, SUMMARIZATION_COUNT
 
 
 @click.group()
@@ -497,19 +498,33 @@ def backfill_summaries(username):
                     continue
                 
                 # Generate summary
+                import time
+                start_time = time.time()
                 success, summary, error = llm_service.summarize(content, link.title, link.url)
+                duration = time.time() - start_time
+                
                 if success and summary:
                     link.summary = summary
                     link.summarized_at = datetime.now()
                     link.llm_model = settings.llm_model_name
                     link.summary_error = None
                     db.commit()
-                    click.echo(f"  [OK] Summary generated ({len(summary)} chars)")
+                    
+                    # Record metrics
+                    SUMMARIZATION_DURATION.labels(status='success').observe(duration)
+                    SUMMARIZATION_COUNT.labels(status='success').inc()
+                    
+                    click.echo(f"  [OK] Summary generated ({len(summary)} chars, {duration:.2f}s)")
                     success_count += 1
                 else:
                     link.summary_retry_count += 1
                     link.summary_error = (error or "Summarization failed")[:500]
                     db.commit()
+                    
+                    # Record metrics
+                    SUMMARIZATION_DURATION.labels(status='error').observe(duration)
+                    SUMMARIZATION_COUNT.labels(status='error').inc()
+                    
                     click.echo(f"  [FAIL] Failed: {error}")
                     failed_count += 1
                     logger.error(f"Backfill failed for link {link.id}: {error}")
