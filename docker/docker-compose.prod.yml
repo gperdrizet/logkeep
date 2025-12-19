@@ -29,7 +29,7 @@ services:
     container_name: logkeep-blue
     restart: unless-stopped
     env_file:
-      - docker/.env.production
+      - .env.production
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/logkeep
       - GUNICORN_WORKERS=9
@@ -62,7 +62,7 @@ services:
     container_name: logkeep-green
     restart: "no"  # Only started during deployments
     env_file:
-      - docker/.env.production
+      - .env.production
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/logkeep
       - GUNICORN_WORKERS=9

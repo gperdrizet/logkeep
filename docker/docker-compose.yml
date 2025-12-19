@@ -68,7 +68,7 @@ services:
       - ../data:/app/data
       - ../logs:/app/logs
     env_file:
-      - docker/.env
+      - .env
     secrets:
       - postgres_db
       - postgres_user
