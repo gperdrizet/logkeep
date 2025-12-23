@@ -11,7 +11,7 @@
   "panels": [
     {
       "id": 1,
-      "title": "Application Status (Blue/Green)",
+      "title": "Application status (blue/green)",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -68,7 +68,7 @@
     },
     {
       "id": 2,
-      "title": "Database Status",
+      "title": "Database status",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -124,7 +124,7 @@
     },
     {
       "id": 3,
-      "title": "Prometheus Status",
+      "title": "Prometheus status",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -180,7 +180,7 @@
     },
     {
       "id": 4,
-      "title": "Nginx Status",
+      "title": "Nginx status",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -236,7 +236,7 @@
     },
     {
       "id": 5,
-      "title": "App & Database Memory Usage",
+      "title": "App & database memory usage",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -282,7 +282,7 @@
     },
     {
       "id": 6,
-      "title": "App & Database CPU Usage",
+      "title": "App & database cpu usage",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -328,7 +328,7 @@
     },
     {
       "id": 7,
-      "title": "Total Links in Database",
+      "title": "Total links in database",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -384,7 +384,7 @@
     },
     {
       "id": 9,
-      "title": "Registered Users",
+      "title": "Registered users",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -440,7 +440,7 @@
     },
     {
       "id": 11,
-      "title": "Database Connections",
+      "title": "Database connections",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -486,7 +486,7 @@
     },
     {
       "id": 12,
-      "title": "Disk Usage",
+      "title": "Disk usage",
       "type": "timeseries",
       "gridPos": {
         "h": 8,
@@ -532,7 +532,7 @@
     },
     {
       "id": 13,
-      "title": "Active Users (Logged In)",
+      "title": "Active users (logged in)",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -580,7 +580,7 @@
     },
     {
       "id": 14,
-      "title": "Link Submit Latency",
+      "title": "Link submit latency",
       "type": "stat",
       "gridPos": {
         "h": 4,
@@ -629,7 +629,7 @@
     },
     {
       "id": 15,
-      "title": "Summarization Latency",
+      "title": "Summarization latency",
       "type": "stat",
       "gridPos": {
         "h": 4,
