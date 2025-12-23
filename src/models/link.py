@@ -27,6 +27,7 @@ class Link(Base):
     llm_model = Column(String(100), nullable=True)  # Model used for summarization
     summary_error = Column(String(500), nullable=True)  # User-friendly error message
     summary_retry_count = Column(Integer, nullable=False, default=0)  # Summarization retry attempts
+    summary_last_retry_at = Column(DateTime, nullable=True)  # Last time summarization was retried
 
     # Relationships
     user = relationship("User", back_populates="links")
