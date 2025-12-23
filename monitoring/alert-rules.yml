@@ -162,3 +162,28 @@ groups:
       #   annotations:
       #     summary: "Database backup is overdue"
       #     description: "No successful backup in the last 24 hours."
+
+  - name: traffic_alerts
+    interval: 30s
+    rules:
+      # High Request Rate Spike
+      - alert: HighRequestRateSpike
+        expr: sum(rate(logkeep_requests_total[5m])) > 10
+        for: 2m
+        labels:
+          severity: warning
+          component: application
+        annotations:
+          summary: "Unusually high request rate detected"
+          description: "Request rate is {{ $value | humanize }} req/sec, which is unusually high. This may indicate increased traffic or a potential attack."
+
+      # Critical Request Rate Spike
+      - alert: CriticalRequestRateSpike
+        expr: sum(rate(logkeep_requests_total[5m])) > 50
+        for: 1m
+        labels:
+          severity: critical
+          component: application
+        annotations:
+          summary: "Critical request rate spike"
+          description: "Request rate is {{ $value | humanize }} req/sec. Immediate investigation required - possible DDoS attack."
