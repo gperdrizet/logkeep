@@ -45,7 +45,7 @@ scrape_configs:
   - job_name: 'logkeep-blue'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['logkeep-blue:8000']
+      - targets: ['172.18.0.1:8001']
         labels:
           service: 'logkeep'
           slot: 'blue'
@@ -55,7 +55,7 @@ scrape_configs:
   - job_name: 'logkeep-green'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['logkeep-green:8000']
+      - targets: ['172.18.0.1:8002']
         labels:
           service: 'logkeep'
           slot: 'green'

@@ -11,8 +11,8 @@ global:
 route:
   receiver: 'email-alerts'
   group_by: ['alertname', 'cluster', 'service']
-  group_wait: 10s
-  group_interval: 10s
+  group_wait: 30s
+  group_interval: 30m
   repeat_interval: 12h
   routes:
     # Critical alerts - send immediately
@@ -44,8 +44,8 @@ receivers:
           <hr>
           <p><strong>Description:</strong> {{ .Annotations.description }}</p>
           <p><strong>Summary:</strong> {{ .Annotations.summary }}</p>
-          <p><strong>Started:</strong> {{ .StartsAt }}</p>
-          {{ if .EndsAt }}<p><strong>Ended:</strong> {{ .EndsAt }}</p>{{ end }}
+          <p><strong>Started (EST):</strong> {{ (.StartsAt.Add -18000000000000).Format "2006-01-02 15:04:05" }}</p>
+          {{ if .EndsAt }}<p><strong>Ended (EST):</strong> {{ (.EndsAt.Add -18000000000000).Format "2006-01-02 15:04:05" }}</p>{{ end }}
           {{ end }}
 
   - name: 'email-critical'
@@ -64,8 +64,8 @@ receivers:
           <hr>
           <p><strong>Description:</strong> {{ .Annotations.description }}</p>
           <p><strong>Summary:</strong> {{ .Annotations.summary }}</p>
-          <p><strong>Started:</strong> {{ .StartsAt }}</p>
-          {{ if .EndsAt }}<p><strong>Ended:</strong> {{ .EndsAt }}</p>{{ end }}
+          <p><strong>Started (EST):</strong> {{ (.StartsAt.Add -18000000000000).Format "2006-01-02 15:04" }}</p>
+          {{ if .EndsAt }}<p><strong>Ended (EST):</strong> {{ (.EndsAt.Add -18000000000000).Format "2006-01-02 15:04" }}</p>{{ end }}
           {{ end }}
           <p><strong>Action Required:</strong> Immediate investigation needed</p>
 
