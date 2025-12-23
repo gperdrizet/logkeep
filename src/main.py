@@ -10,6 +10,8 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 from src.config import settings
 from src.metrics import REQUEST_COUNT, REQUEST_DURATION, LINK_SUBMISSIONS, ACTIVE_USERS, PROCESSING_ERRORS, DB_CONNECTIONS
@@ -27,8 +29,12 @@ from src.utils.auth import get_current_user, get_current_user_optional, verify_p
 from src.utils.encryption import encrypt_token
 from src.utils.logging import logger
 from src.services.processor import process_link
+from src.services.retry_summarization import retry_summarizations
 
 load_dotenv()
+
+# Create scheduler for background tasks
+scheduler = AsyncIOScheduler()
 
 # Create FastAPI app
 app = FastAPI(
@@ -165,7 +171,27 @@ async def startup_event():
     finally:
         db.close()
     
+    # Start scheduled tasks
+    if settings.llm_enabled:
+        # Schedule summarization retry task to run every 20 minutes
+        scheduler.add_job(
+            retry_summarizations,
+            trigger=IntervalTrigger(minutes=20),
+            id='retry_summarizations',
+            name='Retry failed summarizations',
+            replace_existing=True
+        )
+        logger.info("Scheduled summarization retry task (every 20 minutes)")
+    
+    scheduler.start()
     logger.info("LogKeep application started successfully")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Application shutdown tasks."""
+    scheduler.shutdown()
+    logger.info("Scheduler shut down")
 
 
 @app.on_event("shutdown")

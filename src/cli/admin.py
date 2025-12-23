@@ -599,5 +599,20 @@ def reset_summary_retries(username, link_id):
         db.close()
 
 
+@cli.command('retry-summaries')
+def retry_summaries():
+    """Manually trigger the summarization retry task."""
+    from src.services.retry_summarization import retry_summarizations
+    
+    click.echo("[INFO] Running summarization retry task...")
+    try:
+        retry_summarizations()
+        click.echo("[OK] Retry task completed")
+    except Exception as e:
+        click.echo(f"[FAIL] Error running retry task: {str(e)}", err=True)
+        sys.exit(1)
+
+
 if __name__ == '__main__':
     cli()
+

@@ -298,41 +298,30 @@ def process_link(link_id: int) -> None:
                         db.commit()
                         logger.warning(f"Link {link_id} content extraction failed: {extract_error}")
                     else:
-                        # Try to generate summary with retry logic
+                        # Attempt initial summarization (no immediate retries)
+                        # Failed attempts will be retried by the scheduled retry task
                         from src.services.llm import get_llm_service
-                        import time
                         
                         llm_service = get_llm_service()
+                        success_summary, summary, error_summary = llm_service.summarize(
+                            content, link.title, link.url
+                        )
                         
-                        for attempt in range(settings.llm_max_retries):
-                            success_summary, summary, error_summary = llm_service.summarize(
-                                content, link.title, link.url
-                            )
-                            
-                            if success_summary and summary:
-                                # Summary generated successfully
-                                link.summary = summary
-                                link.summarized_at = datetime.now()
-                                link.llm_model = settings.llm_model_name
-                                link.summary_error = None
-                                db.commit()
-                                logger.info(f"Link {link_id} summarized successfully")
-                                break
-                            else:
-                                # Summarization failed
-                                link.summary_retry_count += 1
-                                db.commit()
-                                
-                                if attempt < settings.llm_max_retries - 1:
-                                    # Wait before retry with exponential backoff
-                                    delay = settings.llm_retry_delays[attempt]
-                                    logger.warning(f"Link {link_id} summarization failed (attempt {attempt + 1}/{settings.llm_max_retries}), retrying in {delay}s: {error_summary}")
-                                    time.sleep(delay)
-                                else:
-                                    # Final failure
-                                    link.summary_error = (error_summary or "Summarization failed")[:500]
-                                    db.commit()
-                                    logger.error(f"Link {link_id} summarization failed after {settings.llm_max_retries} attempts: {error_summary}")
+                        if success_summary and summary:
+                            # Summary generated successfully
+                            link.summary = summary
+                            link.summarized_at = datetime.now()
+                            link.llm_model = settings.llm_model_name
+                            link.summary_error = None
+                            logger.info(f"Link {link_id} summarized successfully")
+                        else:
+                            # Initial summarization failed - mark for retry
+                            link.summary_retry_count = 1
+                            link.summary_last_retry_at = datetime.now()
+                            link.summary_error = (error_summary or "Summarization failed")[:500]
+                            logger.warning(f"Link {link_id} initial summarization failed, will retry later: {error_summary}")
+                        
+                        db.commit()
             
             db.commit()
         

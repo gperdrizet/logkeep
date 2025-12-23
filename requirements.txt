@@ -37,3 +37,6 @@ httpx==0.27.0
 
 # Monitoring
 prometheus-client==0.21.0
+
+# Task Scheduling
+APScheduler==3.10.4
