@@ -136,15 +136,15 @@
       "id": 2,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
           "values": false,
           "calcs": ["lastNotNull"],
           "fields": ""
         },
-        "textMode": "auto"
+        "textMode": "value"
       },
       "targets": [
         {
@@ -200,15 +200,15 @@
       "id": 3,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
           "values": false,
           "calcs": ["lastNotNull"],
           "fields": ""
         },
-        "textMode": "auto"
+        "textMode": "value"
       },
       "targets": [
         {
@@ -256,23 +256,23 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 12,
         "w": 6,
         "x": 12,
-        "y": 4
+        "y": 0
       },
       "id": 4,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
           "values": false,
           "calcs": ["lastNotNull"],
           "fields": ""
         },
-        "textMode": "auto"
+        "textMode": "value"
       },
       "targets": [
         {
@@ -320,23 +320,23 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 12,
         "w": 6,
         "x": 18,
-        "y": 4
+        "y": 0
       },
       "id": 5,
       "options": {
         "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
+        "graphMode": "none",
+        "justifyMode": "center",
         "orientation": "auto",
         "reduceOptions": {
           "values": false,
           "calcs": ["lastNotNull"],
           "fields": ""
         },
-        "textMode": "auto"
+        "textMode": "value"
       },
       "targets": [
         {
