@@ -115,13 +115,16 @@ class OllamaLLMService(BaseLLMService):
             return True, summary, None
         except httpx.TimeoutException:
             logger.error("Timeout while generating summary for: %s", url)
+            return False, None, "Summarization service timeout"
+        except httpx.ConnectError as e:
+            logger.error("Connection error to Ollama: %s", e)
             return False, None, "Summarization service unavailable"
         except httpx.HTTPStatusError as e:
             logger.error("HTTP error from Ollama: %d - %s", e.response.status_code, e.response.text)
-            return False, None, "Summarization service unavailable"
+            return False, None, "Summarization service error"
         except Exception as e:
             logger.error("Unexpected error during summarization: %s", e, exc_info=True)
-            return False, None, "Content not suitable for summarization"
+            return False, None, f"Summarization error: {str(e)}"
 
     def _clean_summary(self, summary: str) -> str:
         """
