@@ -55,6 +55,11 @@ services:
     labels:
       - "com.logkeep.slot=blue"
       - "com.logkeep.environment=production"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   # Green Application (New Deployment Target)
   app-green:
@@ -88,6 +93,11 @@ services:
     labels:
       - "com.logkeep.slot=green"
       - "com.logkeep.environment=production"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   # Note: Nginx runs on the host system, not in a container
   # Config files are in nginx/ directory and copied to /etc/nginx/conf.d/
@@ -110,6 +120,8 @@ services:
       - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ../monitoring/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
       - prometheus_data:/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - logkeep-network
     labels:
@@ -271,6 +283,44 @@ services:
       - '-nginx.scrape-uri=http://host.docker.internal/nginx_status'
     ports:
       - "127.0.0.1:9113:9113"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.service=monitoring"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # Blackbox Exporter (SSL Certificate and Endpoint Monitoring)
+  blackbox-exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: logkeep-blackbox-exporter
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9115:9115"
+    volumes:
+      - ../monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    networks:
+      - logkeep-network
+    labels:
+      - "com.logkeep.service=monitoring"
+
+  # Headplane (Headscale web UI)
+  headplane:
+    image: ghcr.io/tale/headplane:latest
+    container_name: headplane
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+    volumes:
+      - /opt/headplane/config.yaml:/etc/headplane/config.yaml:ro
+      - /etc/headscale/config.yaml:/etc/headscale/config.yaml:ro
+    ports:
+      - "127.0.0.1:3001:3001"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
