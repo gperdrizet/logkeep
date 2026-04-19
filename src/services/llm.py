@@ -60,10 +60,11 @@ class OllamaLLMService(BaseLLMService):
             return
         self.client = httpx.Client(timeout=settings.llm_timeout)
         self.base_url = settings.llm_base_url
+        self.api_key = settings.llm_api_key
         self.model_name = settings.llm_model_name
         self.temperature = settings.llm_temperature
         self._initialized = True
-        logger.info("OllamaLLMService initialized: %s, model=%s", self.base_url, self.model_name)
+        logger.info("LLMService initialized: %s, model=%s", self.base_url, self.model_name)
     
 
     
@@ -85,25 +86,29 @@ class OllamaLLMService(BaseLLMService):
                 "Write a 3-5 sentence summary of this article. Output only the summary sentences, nothing else:\n\n"
                 f"{content}"
             )
-            # Make request to Ollama API
-            logger.info("Requesting summary from Ollama for: %s...", title[:50])
+            # Make request to llama.cpp OpenAI-compatible API
+            logger.info("Requesting summary from LLM for: %s...", title[:50])
+            headers = {}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
             response = self.client.post(
-                f"{self.base_url}/api/generate",
+                f"{self.base_url}/v1/completions",
+                headers=headers,
                 json={
                     "model": self.model_name,
                     "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": self.temperature
-                    }
+                    "max_tokens": 1024,
+                    "temperature": self.temperature,
+                    "stream": False
                 }
             )
             response.raise_for_status()
             result = response.json()
             # Extract summary from response
-            summary = result.get("response", "").strip()
+            choices = result.get("choices", [])
+            summary = choices[0].get("text", "").strip() if choices else ""
             if not summary:
-                logger.error("Ollama returned empty summary")
+                logger.error("LLM returned empty summary")
                 return False, None, "Summarization service returned empty result"
             # Post-process to remove narration lines
             summary = self._clean_summary(summary)
@@ -117,7 +122,7 @@ class OllamaLLMService(BaseLLMService):
             logger.error("Timeout while generating summary for: %s", url)
             return False, None, "Summarization service timeout"
         except httpx.ConnectError as e:
-            logger.error("Connection error to Ollama: %s", e)
+            logger.error("Connection error to LLM service: %s", e)
             return False, None, "Summarization service unavailable"
         except httpx.HTTPStatusError as e:
             logger.error("HTTP error from Ollama: %d - %s", e.response.status_code, e.response.text)

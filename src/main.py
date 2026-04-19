@@ -136,7 +136,7 @@ async def startup_event():
         if settings.llm_enabled:
             import httpx
             try:
-                response = httpx.get(f"{settings.llm_base_url}/api/tags", timeout=10)
+                response = httpx.get(f"{settings.llm_base_url}/health", timeout=10)
                 response.raise_for_status()
                 logger.info("LLM service ready")
             except Exception as e:
