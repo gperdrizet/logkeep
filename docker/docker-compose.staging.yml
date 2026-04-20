@@ -17,7 +17,7 @@ services:
       - app_data_staging:/app/data
       - app_logs_staging:/app/logs
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -27,6 +27,11 @@ services:
     labels:
       - "com.logkeep.slot=staging"
       - "com.logkeep.environment=staging"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 
 networks:
   logkeep-network:

@@ -22,6 +22,11 @@ services:
       retries: 5
     networks:
       - logkeep-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
 
   # Blue Application (Active Production)
   app-blue:
@@ -52,14 +57,14 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - logkeep-network
-    labels:
-      - "com.logkeep.slot=blue"
-      - "com.logkeep.environment=production"
     logging:
       driver: json-file
       options:
         max-size: "50m"
         max-file: "5"
+    labels:
+      - "com.logkeep.slot=blue"
+      - "com.logkeep.environment=production"
 
   # Green Application (New Deployment Target)
   app-green:
@@ -90,14 +95,14 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - logkeep-network
-    labels:
-      - "com.logkeep.slot=green"
-      - "com.logkeep.environment=production"
     logging:
       driver: json-file
       options:
         max-size: "50m"
         max-file: "5"
+    labels:
+      - "com.logkeep.slot=green"
+      - "com.logkeep.environment=production"
 
   # Note: Nginx runs on the host system, not in a container
   # Config files are in nginx/ directory and copied to /etc/nginx/conf.d/
@@ -124,6 +129,11 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - logkeep-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "com.logkeep.service=monitoring"
 
@@ -153,6 +163,11 @@ services:
       - prometheus
     networks:
       - logkeep-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "com.logkeep.service=monitoring"
 
@@ -169,6 +184,11 @@ services:
       - loki_data:/loki
     networks:
       - logkeep-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "com.logkeep.service=monitoring"
 
@@ -187,6 +207,11 @@ services:
       - loki
     networks:
       - logkeep-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "com.logkeep.service=monitoring"
 
@@ -208,6 +233,11 @@ services:
       - /:/rootfs:ro
     networks:
       - logkeep-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "com.logkeep.service=monitoring"
 
@@ -224,6 +254,11 @@ services:
       - postgres
     networks:
       - logkeep-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "com.logkeep.service=monitoring"
 
@@ -250,6 +285,11 @@ services:
       - alertmanager_data:/alertmanager
     networks:
       - logkeep-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "com.logkeep.service=monitoring"
 
@@ -271,6 +311,11 @@ services:
       - /dev/kmsg
     networks:
       - logkeep-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "com.logkeep.service=monitoring"
 
@@ -287,13 +332,13 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - logkeep-network
-    labels:
-      - "com.logkeep.service=monitoring"
     logging:
       driver: json-file
       options:
         max-size: "50m"
         max-file: "5"
+    labels:
+      - "com.logkeep.service=monitoring"
 
   # Blackbox Exporter (SSL Certificate and Endpoint Monitoring)
   blackbox-exporter:
@@ -306,6 +351,11 @@ services:
       - ../monitoring/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
     networks:
       - logkeep-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "com.logkeep.service=monitoring"
 
@@ -325,6 +375,11 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - logkeep-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     labels:
       - "com.logkeep.service=monitoring"
 
