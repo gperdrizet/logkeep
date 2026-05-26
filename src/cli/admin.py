@@ -391,6 +391,31 @@ def test_github(username):
         db.close()
 
 
+@cli.command('set-github-token')
+@click.argument('username')
+@click.option('--token', prompt=True, hide_input=True, help='GitHub personal access token')
+def set_github_token(username, token):
+    """Update the GitHub token for a user."""
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.username == username).first()
+        if not user:
+            click.echo(f"[FAIL] User '{username}' not found", err=True)
+            sys.exit(1)
+
+        user.encrypted_github_token = encrypt_token(token)
+        user.github_enabled = True
+        db.commit()
+        click.echo(f"[OK] GitHub token updated for '{username}'")
+
+    except Exception as e:
+        click.echo(f"[FAIL] Error updating token: {str(e)}", err=True)
+        db.rollback()
+        sys.exit(1)
+    finally:
+        db.close()
+
+
 @cli.command('generate-key')
 def generate_key():
     """Generate a new Fernet encryption key."""
