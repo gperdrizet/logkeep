@@ -38,7 +38,7 @@ jobs:
           fi
 
           cd "$DEPLOY_DIR"
-          COMPOSE_PROJECT_NAME=staging docker compose \
+          COMPOSE_PROJECT_NAME=logkeep-staging docker compose \
             -f docker/docker-compose.staging.yml \
             up --build -d --remove-orphans
 
