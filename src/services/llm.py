@@ -107,11 +107,28 @@ class OpenAICompatibleLLMService(BaseLLMService):
             )
             choices = response.choices or []
             summary = (choices[0].message.content or "").strip() if choices else ""
+
+            # Some "OpenAI-compatible" providers only fully support legacy
+            # completions and can return empty chat content.
+            if not summary:
+                legacy = self.client.completions.create(
+                    model=self.model_name,
+                    prompt=prompt,
+                    temperature=self.temperature,
+                    max_tokens=512,
+                )
+                legacy_choices = legacy.choices or []
+                summary = (legacy_choices[0].text or "").strip() if legacy_choices else ""
+
             if not summary:
                 logger.error("LLM returned empty summary")
                 return False, None, "Summarization service returned empty result"
 
             summary = self._clean_summary(summary)
+
+            if not summary:
+                logger.error("LLM summary became empty after post-processing")
+                return False, None, "Summarization returned no usable content"
 
             if len(summary) > settings.summary_max_length:
                 logger.warning("Summary exceeded max length (%d > %d), truncating", len(summary), settings.summary_max_length)
