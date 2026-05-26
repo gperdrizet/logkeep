@@ -38,6 +38,10 @@ jobs:
           fi
 
           cd "$DEPLOY_DIR"
+
+          # Remove any leftover containers from previous/failed deploys
+          docker rm -f logkeep-staging logkeep-postgres-staging 2>/dev/null || true
+
           COMPOSE_PROJECT_NAME=logkeep-staging docker compose \
             -f docker/docker-compose.staging.yml \
             up --build -d --remove-orphans
