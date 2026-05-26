@@ -46,6 +46,11 @@ jobs:
             -f docker/docker-compose.staging.yml \
             up --build -d --remove-orphans
 
+          # Deploy nginx config and reload
+          sudo cp /opt/logkeep-staging/nginx/staging.conf /etc/nginx/conf.d/staging.conf
+          sudo nginx -t
+          sudo systemctl reload nginx
+
           sleep 15
           curl -fsS http://127.0.0.1:8003/health | grep '"status"'
           echo "Staging deploy OK"
