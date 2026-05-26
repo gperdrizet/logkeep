@@ -477,6 +477,30 @@ async def data_page(
     )
 
 
+@app.post("/data/github-settings")
+async def update_github_settings(
+    request: Request,
+    github_token: str | None = Form(None),
+    repo_owner: str = Form(...),
+    repo_name: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update GitHub integration settings for the current user."""
+    if not repo_owner or not repo_name:
+        return RedirectResponse("/data?github_error=Repository+owner+and+name+are+required", status_code=303)
+
+    current_user.repo_owner = repo_owner
+    current_user.repo_name = repo_name
+    current_user.github_enabled = True
+
+    if github_token and github_token.strip():
+        current_user.encrypted_github_token = encrypt_token(github_token.strip())
+
+    db.commit()
+    return RedirectResponse("/data?github_ok=1", status_code=303)
+
+
 @app.get("/submit", response_class=HTMLResponse)
 async def submit_page(
     request: Request,
