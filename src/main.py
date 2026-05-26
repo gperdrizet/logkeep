@@ -141,7 +141,8 @@ async def startup_event():
                     headers["Authorization"] = f"Bearer {settings.llm_api_key}"
 
                 base_url = settings.llm_base_url.rstrip("/")
-                response = httpx.get(f"{base_url}/v1/models", headers=headers, timeout=10)
+                models_url = f"{base_url}/models" if base_url.endswith("/v1") else f"{base_url}/v1/models"
+                response = httpx.get(models_url, headers=headers, timeout=10)
                 response.raise_for_status()
                 logger.info("LLM service ready")
             except Exception as e:
