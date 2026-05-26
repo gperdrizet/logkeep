@@ -22,7 +22,7 @@ services:
     container_name: logkeep-staging
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8003:8000"
+      - "100.64.0.1:8003:8000"
     env_file:
       - .env.staging
     environment:
