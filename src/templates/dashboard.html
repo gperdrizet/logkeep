@@ -109,7 +109,14 @@
             <strong>Error:</strong> {{ link.error_message }}
         </div>
         {% endif %}
-        
+
+        {% if link.status.value == 'failed' %}
+        <form action="/links/{{ link.id }}/delete" method="post" style="margin-top: 8px;"
+              onsubmit="return confirm('Delete this link?');">
+            <button type="submit" class="btn btn-small" style="background: var(--error-color); color: white;">Delete</button>
+        </form>
+        {% endif %}
+
         {% if link.status.value == 'needs_title' %}
         <form action="/links/{{ link.id }}/title" method="post" style="margin-top: 12px;">
             <div class="form-group" style="margin-bottom: 12px;">
