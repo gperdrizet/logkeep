@@ -39,8 +39,11 @@ jobs:
 
           cd "$DEPLOY_DIR"
 
-          # Remove any leftover containers from previous/failed deploys
-          docker rm -f logkeep-staging logkeep-postgres-staging 2>/dev/null || true
+          # Remove any leftover containers from previous/failed deploys.
+          # Match exact names to avoid accidental removals.
+          docker ps -a --format '{{.Names}}' | grep -E '^logkeep(-postgres)?-staging$' || true
+          docker ps -aq --filter name='^/logkeep-staging$' | xargs -r docker rm -f
+          docker ps -aq --filter name='^/logkeep-postgres-staging$' | xargs -r docker rm -f
 
           COMPOSE_PROJECT_NAME=logkeep-staging docker compose \
             -f docker/docker-compose.staging.yml \
