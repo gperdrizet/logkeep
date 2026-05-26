@@ -47,6 +47,10 @@ jobs:
             up --build -d --remove-orphans
 
           sleep 15
+
+          # Initialize database tables (idempotent, safe to run on every deploy)
+          docker exec logkeep-staging python -m src.cli.admin init-db
+
           curl -fsS http://100.64.0.1:8003/health | grep '"status"'
           echo "Staging deploy OK"
           REMOTE
