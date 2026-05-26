@@ -52,4 +52,3 @@ jobs:
           REMOTE
 
           rm -f "$KEY_FILE"
-          fi
