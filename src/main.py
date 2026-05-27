@@ -539,7 +539,6 @@ async def admin_create_invites(
         success, error_msg = send_invite_email(
             recipient=recipient_email.strip(),
             invite_codes=generated_codes,
-            sent_by=current_user.username,
         )
 
         if success:
