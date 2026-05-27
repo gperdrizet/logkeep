@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     max_tags_per_user: int = Field(default=1000, env="MAX_TAGS_PER_USER")
     max_retries: int = Field(default=3, env="MAX_RETRIES")
     processing_timeout_minutes: int = Field(default=5, env="PROCESSING_TIMEOUT_MINUTES")
+    admin_usernames: str = Field(default="", env="ADMIN_USERNAMES")
     
     # Logging
     log_level: str = Field(default="INFO", env="LOG_LEVEL")

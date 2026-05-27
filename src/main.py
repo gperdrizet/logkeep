@@ -25,7 +25,7 @@ from src.models.user import User
 from src.models.link import Link
 from src.models.invite import Invite
 from src.utils.database import get_db, SessionLocal
-from src.utils.auth import get_current_user, get_current_user_optional, verify_password, create_access_token, get_password_hash
+from src.utils.auth import get_current_user, get_current_user_optional, get_current_admin_user, verify_password, create_access_token, get_password_hash
 from src.utils.encryption import encrypt_token
 from src.utils.logging import logger
 from src.services.processor import process_link
@@ -480,6 +480,128 @@ async def data_page(
             "tag_histogram": tag_histogram,
             "max_tag_count": max_tag_count
         }
+    )
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page(
+    request: Request,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Admin dashboard for user and invite management."""
+    users = db.query(User).order_by(User.created_at.desc()).all()
+    invites = db.query(Invite).filter(
+        Invite.used_by_user_id.is_(None)
+    ).order_by(Invite.created_at.desc()).limit(30).all()
+
+    return templates.TemplateResponse(
+        "admin.html",
+        {
+            "request": request,
+            "user": current_user,
+            "users": users,
+            "invites": invites,
+            "success": request.query_params.get("success"),
+            "error": request.query_params.get("error"),
+        }
+    )
+
+
+@app.post("/admin/invites")
+async def admin_create_invites(
+    count: int = Form(1),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Generate invite codes as admin."""
+    if count < 1 or count > 100:
+        return RedirectResponse(
+            url="/admin?error=Invite+count+must+be+between+1+and+100",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    for _ in range(count):
+        db.add(Invite(created_by_user_id=current_user.id))
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/admin?success=Generated+{count}+invite+code(s)",
+        status_code=status.HTTP_302_FOUND
+    )
+
+
+@app.post("/admin/users")
+async def admin_create_user(
+    username: str = Form(...),
+    password: str = Form(...),
+    _: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Create a user as admin (without invite code)."""
+    username = username.strip()
+
+    if len(username) < 3:
+        return RedirectResponse(
+            url="/admin?error=Username+must+be+at+least+3+characters",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    if len(password) < 8:
+        return RedirectResponse(
+            url="/admin?error=Password+must+be+at+least+8+characters",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    existing = db.query(User).filter(User.username == username).first()
+    if existing:
+        return RedirectResponse(
+            url="/admin?error=Username+already+exists",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    user = User(
+        username=username,
+        hashed_password=get_password_hash(password),
+        github_enabled=False,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/admin?success=User+{username}+created",
+        status_code=status.HTTP_302_FOUND
+    )
+
+
+@app.post("/admin/users/{user_id}/delete")
+async def admin_delete_user(
+    user_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a user account as admin."""
+    if user_id == current_user.id:
+        return RedirectResponse(
+            url="/admin?error=Cannot+delete+your+own+account",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return RedirectResponse(
+            url="/admin?error=User+not+found",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    username = user.username
+    db.delete(user)
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/admin?success=User+{username}+deleted",
+        status_code=status.HTTP_302_FOUND
     )
 
 

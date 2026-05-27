@@ -18,6 +18,16 @@ load_dotenv()
 security = HTTPBearer(auto_error=False)
 
 
+def is_admin_user(user: User) -> bool:
+    """Check if a user is in configured admin usernames."""
+    admins = {
+        name.strip().lower()
+        for name in settings.admin_usernames.split(",")
+        if name.strip()
+    }
+    return user.username.lower() in admins
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash."""
     return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
@@ -134,8 +144,23 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User account is deactivated"
         )
+
+    # Attach transient admin flag for template/navigation convenience.
+    user.is_admin = is_admin_user(user)
     
     return user
+
+
+async def get_current_admin_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Require an authenticated admin user."""
+    if not is_admin_user(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user
 
 
 async def get_current_user_optional(
