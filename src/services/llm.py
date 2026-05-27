@@ -124,11 +124,14 @@ class OpenAICompatibleLLMService(BaseLLMService):
                 logger.error("LLM returned empty summary")
                 return False, None, "Summarization service returned empty result"
 
+            raw_summary = summary
             summary = self._clean_summary(summary)
 
             if not summary:
-                logger.error("LLM summary became empty after post-processing")
-                return False, None, "Summarization returned no usable content"
+                # Be conservative: if cleanup over-filters valid output, keep
+                # provider content instead of failing the summarization.
+                logger.warning("LLM summary became empty after post-processing; using raw content")
+                summary = raw_summary
 
             if len(summary) > settings.summary_max_length:
                 logger.warning("Summary exceeded max length (%d > %d), truncating", len(summary), settings.summary_max_length)
@@ -166,7 +169,7 @@ class OpenAICompatibleLLMService(BaseLLMService):
             # Remove lines that look like narration or instructions
             if not line:
                 continue
-            if re.match(r"^(summary:|here( is| are)? (a|the|an|\d+) (summary|sentence|key|main)( sentence)?s?:?|in summary|to summarize|the article|this article|overall,|in conclusion|conclusion:|key points:|main points:|highlights:|takeaways:|tl;dr:)", line, re.IGNORECASE):
+            if re.match(r"^(summary:|here( is| are)? (a|the|an|\d+) (summary|sentence|key|main)( sentence)?s?:?|in summary:|to summarize:|conclusion:|key points:|main points:|highlights:|takeaways:|tl;dr:)", line, re.IGNORECASE):
                 continue
             # Remove lines that are just markdown bullets or numbers
             if re.match(r"^[-*\d. ]+$", line):
