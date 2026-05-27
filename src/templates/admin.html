@@ -22,69 +22,6 @@
 {% endif %}
 
 <div class="card" style="margin-bottom: 20px;">
-    <h3 class="card-title">Generate Invite Codes</h3>
-    <form action="/admin/invites" method="post">
-        <div class="form-group">
-            <label for="recipient-email">Recipient email (optional)</label>
-            <input type="email" id="recipient-email" name="recipient_email" placeholder="new-user@example.com">
-            <small style="color: var(--link-url-color);">If provided, generated invite codes are emailed immediately.</small>
-        </div>
-
-        <button type="submit" class="btn btn-primary">Generate</button>
-    </form>
-</div>
-
-<div class="card" style="margin-bottom: 20px;">
-    <h3 class="card-title">Create User</h3>
-    <form action="/admin/users" method="post">
-        <div class="form-group">
-            <label for="new-username">Username</label>
-            <input type="text" id="new-username" name="username" minlength="3" maxlength="50" required>
-        </div>
-
-        <div class="form-group">
-            <label for="new-password">Password</label>
-            <input type="password" id="new-password" name="password" minlength="8" maxlength="100" required>
-        </div>
-
-        <button type="submit" class="btn btn-primary">Create User</button>
-    </form>
-</div>
-
-<div class="card" style="margin-bottom: 20px;">
-    <h3 class="card-title">Unused Invite Codes</h3>
-    {% if invites %}
-    <div style="overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-                <tr>
-                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Code</th>
-                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Sent To</th>
-                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for invite in invites %}
-                <tr>
-                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); font-family: monospace;">{{ invite.code }}</td>
-                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ invite.delivery.recipient_email if invite.delivery else 'Not sent' }}</td>
-                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); text-align: right;">
-                        <form action="/admin/invites/{{ invite.id }}/invalidate" method="post" style="display: inline;"
-                              onsubmit="return confirm('Invalidate invite {{ invite.code }}?');">
-                            <button type="submit" class="btn" style="background: var(--error-color); color: white;">Invalidate</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    {% else %}
-    <p>No unused invites.</p>
-    {% endif %}
-</div>
-
-<div class="card">
     <h3 class="card-title">Users</h3>
     {% if users %}
     <div style="overflow-x: auto;">
@@ -128,5 +65,68 @@
     {% else %}
     <p>No users found.</p>
     {% endif %}
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+    <h3 class="card-title">Unused Invite Codes</h3>
+    {% if invites %}
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Code</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Sent To</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for invite in invites %}
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); font-family: monospace;">{{ invite.code }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ invite.delivery.recipient_email if invite.delivery else 'Not sent' }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); text-align: right;">
+                        <form action="/admin/invites/{{ invite.id }}/invalidate" method="post" style="display: inline;"
+                              onsubmit="return confirm('Invalidate invite {{ invite.code }}?');">
+                            <button type="submit" class="btn" style="background: var(--error-color); color: white;">Invalidate</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No unused invites.</p>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+    <h3 class="card-title">Generate Invite Code</h3>
+    <form action="/admin/invites" method="post">
+        <div class="form-group">
+            <label for="recipient-email">Recipient email (optional)</label>
+            <input type="email" id="recipient-email" name="recipient_email" placeholder="new-user@example.com">
+            <small style="color: var(--link-url-color);">If provided, generated invite codes are emailed immediately.</small>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Generate</button>
+    </form>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+    <h3 class="card-title">Create User</h3>
+    <form action="/admin/users" method="post">
+        <div class="form-group">
+            <label for="new-username">Username</label>
+            <input type="text" id="new-username" name="username" minlength="3" maxlength="50" required>
+        </div>
+
+        <div class="form-group">
+            <label for="new-password">Password</label>
+            <input type="password" id="new-password" name="password" minlength="8" maxlength="100" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Create User</button>
+    </form>
 </div>
 {% endblock %}
