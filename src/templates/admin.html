@@ -2,6 +2,14 @@
 
 {% block title %}Admin - LogKeep{% endblock %}
 
+{% block extra_head %}
+<style>
+    main.container {
+        max-width: 1200px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <h2>Admin Dashboard</h2>
 
@@ -84,22 +92,43 @@
 <div class="card">
     <h3 class="card-title">Users</h3>
     {% if users %}
-    <div style="display: grid; gap: 10px;">
-        {% for account in users %}
-        <div style="padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-            <div>
-                <strong>{{ account.username }}</strong>
-                <div style="font-size: 13px; color: var(--link-url-color);">Created {{ account.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
-            </div>
-            {% if account.id != user.id %}
-            <form action="/admin/users/{{ account.id }}/delete" method="post" onsubmit="return confirm('Delete user {{ account.username }}? This removes all their data.');">
-                <button type="submit" class="btn" style="background: var(--error-color); color: white;">Delete</button>
-            </form>
-            {% else %}
-            <span style="font-size: 12px; color: var(--link-url-color);">Current user</span>
-            {% endif %}
-        </div>
-        {% endfor %}
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Username</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Email</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">GitHub</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Total Links</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Total Tags</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Created</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Last Access</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for account in users %}
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ account.username }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ account.email }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ 'Yes' if account.github_enabled else 'No' }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); text-align: right;">{{ account.total_links }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); text-align: right;">{{ account.total_tags }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ account.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ account.last_access_at.strftime('%Y-%m-%d %H:%M') if account.last_access_at else 'Never' }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); text-align: right;">
+                        {% if account.id != user.id %}
+                        <form action="/admin/users/{{ account.id }}/delete" method="post" style="display: inline;" onsubmit="return confirm('Delete user {{ account.username }}? This removes all their data.');">
+                            <button type="submit" class="btn" style="background: var(--error-color); color: white;">Delete</button>
+                        </form>
+                        {% else %}
+                        <span style="font-size: 12px; color: var(--link-url-color);">Current</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
     {% else %}
     <p>No users found.</p>

@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from dotenv import load_dotenv
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -25,6 +26,7 @@ from src.models.user import User
 from src.models.link import Link
 from src.models.invite import Invite
 from src.models.invite_delivery import InviteDelivery
+from src.models.tag import Tag
 from src.utils.database import get_db, SessionLocal
 from src.utils.auth import get_current_user, get_current_user_optional, get_current_admin_user, verify_password, create_access_token, get_password_hash
 from src.utils.encryption import encrypt_token
@@ -496,12 +498,47 @@ async def admin_page(
         Invite.used_by_user_id.is_(None)
     ).order_by(Invite.created_at.desc()).limit(30).all()
 
+    link_counts = dict(
+        db.query(Link.user_id, func.count(Link.id))
+        .group_by(Link.user_id)
+        .all()
+    )
+    tag_counts = dict(
+        db.query(Tag.user_id, func.count(Tag.id))
+        .group_by(Tag.user_id)
+        .all()
+    )
+    last_access = dict(
+        db.query(Link.user_id, func.max(Link.submitted_at))
+        .group_by(Link.user_id)
+        .all()
+    )
+
+    admin_users = []
+    for account in users:
+        email = "N/A"
+        if account.invite_used and account.invite_used.delivery:
+            email = account.invite_used.delivery.recipient_email
+
+        admin_users.append(
+            {
+                "id": account.id,
+                "username": account.username,
+                "email": email,
+                "github_enabled": account.github_enabled,
+                "total_links": int(link_counts.get(account.id, 0)),
+                "total_tags": int(tag_counts.get(account.id, 0)),
+                "created_at": account.created_at,
+                "last_access_at": last_access.get(account.id),
+            }
+        )
+
     return templates.TemplateResponse(
         "admin.html",
         {
             "request": request,
             "user": current_user,
-            "users": users,
+            "users": admin_users,
             "invites": invites,
             "success": request.query_params.get("success"),
             "error": request.query_params.get("error"),
