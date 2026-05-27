@@ -103,7 +103,7 @@ class OpenAICompatibleLLMService(BaseLLMService):
                     },
                 ],
                 temperature=self.temperature,
-                max_tokens=512,
+                max_tokens=settings.llm_max_output_tokens,
             )
             choices = response.choices or []
             summary = (choices[0].message.content or "").strip() if choices else ""
@@ -115,7 +115,7 @@ class OpenAICompatibleLLMService(BaseLLMService):
                     model=self.model_name,
                     prompt=prompt,
                     temperature=self.temperature,
-                    max_tokens=512,
+                    max_tokens=settings.llm_max_output_tokens,
                 )
                 legacy_choices = legacy.choices or []
                 summary = (legacy_choices[0].text or "").strip() if legacy_choices else ""
@@ -136,6 +136,8 @@ class OpenAICompatibleLLMService(BaseLLMService):
             if len(summary) > settings.summary_max_length:
                 logger.warning("Summary exceeded max length (%d > %d), truncating", len(summary), settings.summary_max_length)
                 summary = summary[:settings.summary_max_length]
+
+            summary = self._trim_incomplete_trailing_sentence(summary)
 
             logger.info("Summary generated successfully (%d chars)", len(summary))
             return True, summary, None
@@ -176,6 +178,27 @@ class OpenAICompatibleLLMService(BaseLLMService):
                 continue
             cleaned.append(line)
         return "\n".join(cleaned)
+
+    def _trim_incomplete_trailing_sentence(self, summary: str) -> str:
+        """Trim trailing partial sentence if output appears cut off."""
+        text = (summary or "").strip()
+        if not text:
+            return text
+
+        if text.endswith((".", "!", "?")):
+            return text
+
+        last_period = text.rfind(".")
+        last_bang = text.rfind("!")
+        last_q = text.rfind("?")
+        last_end = max(last_period, last_bang, last_q)
+
+        # Keep original if no sentence boundary exists yet.
+        if last_end == -1:
+            return text
+
+        trimmed = text[: last_end + 1].strip()
+        return trimmed or text
 
 
 def get_llm_service() -> BaseLLMService:
