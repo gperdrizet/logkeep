@@ -548,26 +548,16 @@ async def admin_page(
 
 @app.post("/admin/invites")
 async def admin_create_invites(
-    count: int = Form(1),
     recipient_email: str | None = Form(None),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
     """Generate invite codes as admin."""
-    if count < 1 or count > 100:
-        return RedirectResponse(
-            url="/admin?error=Invite+count+must+be+between+1+and+100",
-            status_code=status.HTTP_302_FOUND
-        )
-
-    generated_codes: list[str] = []
-    generated_invite_ids: list[int] = []
-    for _ in range(count):
-        invite = Invite(created_by_user_id=current_user.id)
-        db.add(invite)
-        db.flush()
-        generated_invite_ids.append(invite.id)
-        generated_codes.append(invite.code)
+    invite = Invite(created_by_user_id=current_user.id)
+    db.add(invite)
+    db.flush()
+    generated_invite_ids = [invite.id]
+    generated_codes = [invite.code]
     db.commit()
 
     if recipient_email and recipient_email.strip():
@@ -584,7 +574,7 @@ async def admin_create_invites(
             db.commit()
 
             return RedirectResponse(
-                url=f"/admin?success=Generated+{count}+invite+code(s)+and+emailed+them",
+                url="/admin?success=Generated+invite+code+and+emailed+it",
                 status_code=status.HTTP_302_FOUND
             )
 
@@ -594,7 +584,7 @@ async def admin_create_invites(
         )
 
     return RedirectResponse(
-        url=f"/admin?success=Generated+{count}+invite+code(s)",
+        url="/admin?success=Generated+invite+code",
         status_code=status.HTTP_302_FOUND
     )
 
