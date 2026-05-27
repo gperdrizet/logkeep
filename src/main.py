@@ -511,6 +511,7 @@ async def admin_page(
 @app.post("/admin/invites")
 async def admin_create_invites(
     count: int = Form(1),
+    recipient_email: str | None = Form(None),
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -521,9 +522,33 @@ async def admin_create_invites(
             status_code=status.HTTP_302_FOUND
         )
 
+    generated_codes: list[str] = []
     for _ in range(count):
-        db.add(Invite(created_by_user_id=current_user.id))
+        invite = Invite(created_by_user_id=current_user.id)
+        db.add(invite)
+        db.flush()
+        generated_codes.append(invite.code)
     db.commit()
+
+    if recipient_email and recipient_email.strip():
+        from src.services.email import send_invite_email
+
+        success, error_msg = send_invite_email(
+            recipient=recipient_email.strip(),
+            invite_codes=generated_codes,
+            sent_by=current_user.username,
+        )
+
+        if success:
+            return RedirectResponse(
+                url=f"/admin?success=Generated+{count}+invite+code(s)+and+emailed+them",
+                status_code=status.HTTP_302_FOUND
+            )
+
+        return RedirectResponse(
+            url=f"/admin?error=Generated+codes+but+email+failed:+{error_msg}",
+            status_code=status.HTTP_302_FOUND
+        )
 
     return RedirectResponse(
         url=f"/admin?success=Generated+{count}+invite+code(s)",

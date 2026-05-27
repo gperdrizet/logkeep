@@ -18,6 +18,13 @@ class Settings(BaseSettings):
     max_retries: int = Field(default=3, env="MAX_RETRIES")
     processing_timeout_minutes: int = Field(default=5, env="PROCESSING_TIMEOUT_MINUTES")
     admin_usernames: str = Field(default="", env="ADMIN_USERNAMES")
+
+    # Email / SMTP
+    smtp_host: str = Field(default="", env="SMTP_HOST")
+    smtp_port: int = Field(default=587, env="SMTP_PORT")
+    smtp_user: str = Field(default="", env="SMTP_USER")
+    smtp_password: str = Field(default="", env="SMTP_PASSWORD")
+    smtp_from: str = Field(default="", env="SMTP_FROM")
     
     # Logging
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
