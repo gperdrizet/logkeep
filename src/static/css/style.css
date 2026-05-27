@@ -177,6 +177,7 @@ label {
 
 input[type="text"],
 input[type="password"],
+input[type="email"],
 input[type="url"],
 textarea,
 select {
