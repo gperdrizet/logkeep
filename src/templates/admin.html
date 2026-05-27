@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Admin - LogKeep{% endblock %}
+{% block title %}Admin dashboard: LogKeep{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -11,7 +11,7 @@
 {% endblock %}
 
 {% block content %}
-<h2>Admin Dashboard</h2>
+<h2>Admin dashboard</h2>
 
 {% if success %}
 <div class="alert alert-success">{{ success }}</div>
@@ -31,10 +31,10 @@
                     <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Username</th>
                     <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Email</th>
                     <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">GitHub</th>
-                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Total Links</th>
-                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Total Tags</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Total links</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Total tags</th>
                     <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Created</th>
-                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Last Access</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Last access</th>
                     <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Delete</th>
                 </tr>
             </thead>
@@ -68,14 +68,14 @@
 </div>
 
 <div class="card" style="margin-bottom: 20px;">
-    <h3 class="card-title">Unused Invite Codes</h3>
+    <h3 class="card-title">Unused invite codes</h3>
     {% if invites %}
     <div style="overflow-x: auto;">
         <table style="width: 100%; border-collapse: collapse;">
             <thead>
                 <tr>
                     <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Code</th>
-                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Sent To</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Sent to</th>
                     <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Action</th>
                 </tr>
             </thead>
@@ -101,7 +101,7 @@
 </div>
 
 <div class="card" style="margin-bottom: 20px;">
-    <h3 class="card-title">Generate Invite Code</h3>
+    <h3 class="card-title">Generate invite code</h3>
     <form action="/admin/invites" method="post">
         <div class="form-group">
             <label for="recipient-email">Recipient email (optional)</label>
@@ -114,7 +114,7 @@
 </div>
 
 <div class="card" style="margin-bottom: 20px;">
-    <h3 class="card-title">Create User</h3>
+    <h3 class="card-title">Create user</h3>
     <form action="/admin/users" method="post">
         <div class="form-group">
             <label for="new-username">Username</label>
