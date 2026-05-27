@@ -20,6 +20,7 @@ class Invite(Base):
     # Relationships
     creator = relationship("User", foreign_keys=[created_by_user_id], back_populates="invites_created")
     used_by_user = relationship("User", foreign_keys=[used_by_user_id], back_populates="invite_used")
+    delivery = relationship("InviteDelivery", back_populates="invite", uselist=False, cascade="all, delete-orphan")
 
     @property
     def is_used(self):

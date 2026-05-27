@@ -51,12 +51,30 @@
 <div class="card" style="margin-bottom: 20px;">
     <h3 class="card-title">Unused Invite Codes</h3>
     {% if invites %}
-    <div style="display: grid; gap: 8px;">
-        {% for invite in invites %}
-        <div style="padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; font-family: monospace;">
-            {{ invite.code }}
-        </div>
-        {% endfor %}
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Code</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Sent To</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for invite in invites %}
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); font-family: monospace;">{{ invite.code }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ invite.delivery.recipient_email if invite.delivery else 'Not sent' }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); text-align: right;">
+                        <form action="/admin/invites/{{ invite.id }}/invalidate" method="post" style="display: inline;"
+                              onsubmit="return confirm('Invalidate invite {{ invite.code }}?');">
+                            <button type="submit" class="btn" style="background: var(--error-color); color: white;">Invalidate</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
     {% else %}
     <p>No unused invites.</p>

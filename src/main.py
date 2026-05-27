@@ -24,6 +24,7 @@ from src.models import LinkStatus
 from src.models.user import User
 from src.models.link import Link
 from src.models.invite import Invite
+from src.models.invite_delivery import InviteDelivery
 from src.utils.database import get_db, SessionLocal
 from src.utils.auth import get_current_user, get_current_user_optional, get_current_admin_user, verify_password, create_access_token, get_password_hash
 from src.utils.encryption import encrypt_token
@@ -523,10 +524,12 @@ async def admin_create_invites(
         )
 
     generated_codes: list[str] = []
+    generated_invite_ids: list[int] = []
     for _ in range(count):
         invite = Invite(created_by_user_id=current_user.id)
         db.add(invite)
         db.flush()
+        generated_invite_ids.append(invite.id)
         generated_codes.append(invite.code)
     db.commit()
 
@@ -540,6 +543,10 @@ async def admin_create_invites(
         )
 
         if success:
+            for invite_id in generated_invite_ids:
+                db.add(InviteDelivery(invite_id=invite_id, recipient_email=recipient_email.strip()))
+            db.commit()
+
             return RedirectResponse(
                 url=f"/admin?success=Generated+{count}+invite+code(s)+and+emailed+them",
                 status_code=status.HTTP_302_FOUND
@@ -552,6 +559,35 @@ async def admin_create_invites(
 
     return RedirectResponse(
         url=f"/admin?success=Generated+{count}+invite+code(s)",
+        status_code=status.HTTP_302_FOUND
+    )
+
+
+@app.post("/admin/invites/{invite_id}/invalidate")
+async def admin_invalidate_invite(
+    invite_id: int,
+    _: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Invalidate an unused invite code."""
+    invite = db.query(Invite).filter(Invite.id == invite_id).first()
+    if not invite:
+        return RedirectResponse(
+            url="/admin?error=Invite+not+found",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    if invite.is_used:
+        return RedirectResponse(
+            url="/admin?error=Cannot+invalidate+a+used+invite",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    db.delete(invite)
+    db.commit()
+
+    return RedirectResponse(
+        url="/admin?success=Invite+invalidated",
         status_code=status.HTTP_302_FOUND
     )
 
