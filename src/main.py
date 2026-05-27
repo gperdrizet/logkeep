@@ -2,6 +2,7 @@
 import json
 import os
 from datetime import datetime, timedelta
+from urllib.parse import quote_plus
 from typing import Optional
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, status, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -414,7 +415,9 @@ async def dashboard(
             "any_pending_summaries": any_pending_summaries,
             "user_tags": user_tag_names,
             "links": links,
-            "filter_tag_list": filter_tag_list
+            "filter_tag_list": filter_tag_list,
+            "success": request.query_params.get("success"),
+            "error": request.query_params.get("error"),
         }
     )
 
@@ -721,18 +724,8 @@ async def submit_page(
     request: Request,
     current_user: User = Depends(get_current_user)
 ):
-    """Link submission page."""
-    # Get user tags as list of names
-    user_tags = [tag.name for tag in current_user.tags] if current_user.tags else []
-    
-    return templates.TemplateResponse(
-        "submit.html",
-        {
-            "request": request,
-            "user": current_user,
-            "user_tags": sorted(user_tags)
-        }
-    )
+    """Legacy submit route, now merged into dashboard."""
+    return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
 
 
 
@@ -756,15 +749,9 @@ async def submit_link(
     
     # Validate URL
     if not validate_url(url):
-        return templates.TemplateResponse(
-            "submit.html",
-            {
-                "request": request,
-                "user": current_user,
-                "user_tags": sorted(current_user.tags),
-                "error": "Invalid URL format"
-            },
-            status_code=400
+        return RedirectResponse(
+            url="/dashboard?error=Invalid+URL+format",
+            status_code=status.HTTP_302_FOUND
         )
     
     # Parse tags
@@ -801,27 +788,15 @@ async def submit_link(
         
     except DuplicateError:
         LINK_SUBMISSIONS.labels(status='duplicate').inc()
-        return templates.TemplateResponse(
-            "submit.html",
-            {
-                "request": request,
-                "user": current_user,
-                "user_tags": sorted([tag.name for tag in current_user.tags]),
-                "error": "This URL has already been submitted. Check your dashboard."
-            },
-            status_code=409
+        return RedirectResponse(
+            url="/dashboard?error=This+URL+has+already+been+submitted.+Check+your+dashboard.",
+            status_code=status.HTTP_302_FOUND
         )
     except ValidationError as e:
         LINK_SUBMISSIONS.labels(status='failed').inc()
-        return templates.TemplateResponse(
-            "submit.html",
-            {
-                "request": request,
-                "user": current_user,
-                "user_tags": sorted([tag.name for tag in current_user.tags]),
-                "error": str(e)
-            },
-            status_code=400
+        return RedirectResponse(
+            url=f"/dashboard?error={quote_plus(str(e))}",
+            status_code=status.HTTP_302_FOUND
         )
 
 
