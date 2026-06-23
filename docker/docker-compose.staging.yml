@@ -6,7 +6,7 @@ services:
     env_file:
       - .env.staging
     environment:
-      POSTGRES_DB: logkeep_staging
+      POSTGRES_DB: ${POSTGRES_DB:-logkeep_staging}
     volumes:
       - postgres_data_staging:/var/lib/postgresql/data
     healthcheck:

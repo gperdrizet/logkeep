@@ -41,6 +41,7 @@ jobs:
           SSH_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
           HOST: ${{ secrets.VPS_HOST }}
           USER: ${{ secrets.VPS_USER }}
+          DEPLOY_SHA: ${{ github.sha }}
         run: |
           KEY_FILE=$(mktemp)
           chmod 600 "$KEY_FILE"
@@ -50,17 +51,27 @@ jobs:
             -p 44441 \
             -o StrictHostKeyChecking=no \
             -o BatchMode=yes \
-            "$USER@$HOST" bash -s << 'REMOTE'
+            "$USER@$HOST" bash -s -- "$DEPLOY_SHA" << 'REMOTE'
           set -euo pipefail
+
+          DEPLOY_SHA="$1"
 
           DEPLOY_DIR=/opt/logkeep
           if [ ! -d "$DEPLOY_DIR/.git" ]; then
             git clone https://github.com/gperdrizet/logkeep.git "$DEPLOY_DIR"
-          else
-            git -C "$DEPLOY_DIR" pull --ff-only
           fi
 
+          git -C "$DEPLOY_DIR" fetch --prune origin
+          git -C "$DEPLOY_DIR" checkout -f "$DEPLOY_SHA"
+
           cd "$DEPLOY_DIR"
+
+          if ! docker compose -f docker/docker-compose.prod.yml config >/dev/null; then
+            echo "docker-compose.prod.yml failed validation on VPS"
+            nl -ba docker/docker-compose.prod.yml | sed -n '1,120p'
+            exit 1
+          fi
+
           docker compose \
             -f docker/docker-compose.prod.yml \
             up --build -d --remove-orphans
