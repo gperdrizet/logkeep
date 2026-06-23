@@ -2,12 +2,14 @@
 import json
 import os
 from datetime import datetime, timedelta
+from urllib.parse import quote_plus
 from typing import Optional
 from fastapi import FastAPI, Request, Depends, Form, HTTPException, status, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from dotenv import load_dotenv
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -24,8 +26,10 @@ from src.models import LinkStatus
 from src.models.user import User
 from src.models.link import Link
 from src.models.invite import Invite
+from src.models.invite_delivery import InviteDelivery
+from src.models.tag import Tag
 from src.utils.database import get_db, SessionLocal
-from src.utils.auth import get_current_user, get_current_user_optional, verify_password, create_access_token, get_password_hash
+from src.utils.auth import get_current_user, get_current_user_optional, get_current_admin_user, verify_password, create_access_token, get_password_hash
 from src.utils.encryption import encrypt_token
 from src.utils.logging import logger
 from src.services.processor import process_link
@@ -141,7 +145,8 @@ async def startup_event():
                     headers["Authorization"] = f"Bearer {settings.llm_api_key}"
 
                 base_url = settings.llm_base_url.rstrip("/")
-                response = httpx.get(f"{base_url}/models", headers=headers, timeout=10)
+                models_url = f"{base_url}/models" if base_url.endswith("/v1") else f"{base_url}/v1/models"
+                response = httpx.get(models_url, headers=headers, timeout=10)
                 response.raise_for_status()
                 logger.info("LLM service ready")
             except Exception as e:
@@ -410,7 +415,9 @@ async def dashboard(
             "any_pending_summaries": any_pending_summaries,
             "user_tags": user_tag_names,
             "links": links,
-            "filter_tag_list": filter_tag_list
+            "filter_tag_list": filter_tag_list,
+            "success": request.query_params.get("success"),
+            "error": request.query_params.get("error"),
         }
     )
 
@@ -482,23 +489,243 @@ async def data_page(
     )
 
 
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page(
+    request: Request,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Admin dashboard for user and invite management."""
+    users = db.query(User).order_by(User.created_at.desc()).all()
+    invites = db.query(Invite).filter(
+        Invite.used_by_user_id.is_(None)
+    ).order_by(Invite.created_at.desc()).limit(30).all()
+
+    link_counts = dict(
+        db.query(Link.user_id, func.count(Link.id))
+        .group_by(Link.user_id)
+        .all()
+    )
+    tag_counts = dict(
+        db.query(Tag.user_id, func.count(Tag.id))
+        .group_by(Tag.user_id)
+        .all()
+    )
+    last_access = dict(
+        db.query(Link.user_id, func.max(Link.submitted_at))
+        .group_by(Link.user_id)
+        .all()
+    )
+
+    admin_users = []
+    for account in users:
+        email = "N/A"
+        if account.invite_used and account.invite_used.delivery:
+            email = account.invite_used.delivery.recipient_email
+
+        admin_users.append(
+            {
+                "id": account.id,
+                "username": account.username,
+                "email": email,
+                "github_enabled": account.github_enabled,
+                "total_links": int(link_counts.get(account.id, 0)),
+                "total_tags": int(tag_counts.get(account.id, 0)),
+                "created_at": account.created_at,
+                "last_access_at": last_access.get(account.id),
+            }
+        )
+
+    return templates.TemplateResponse(
+        "admin.html",
+        {
+            "request": request,
+            "user": current_user,
+            "users": admin_users,
+            "invites": invites,
+            "success": request.query_params.get("success"),
+            "error": request.query_params.get("error"),
+        }
+    )
+
+
+@app.post("/admin/invites")
+async def admin_create_invites(
+    recipient_email: str | None = Form(None),
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Generate invite codes as admin."""
+    invite = Invite(created_by_user_id=current_user.id)
+    db.add(invite)
+    db.flush()
+    generated_invite_ids = [invite.id]
+    generated_codes = [invite.code]
+    db.commit()
+
+    if recipient_email and recipient_email.strip():
+        from src.services.email import send_invite_email
+
+        success, error_msg = send_invite_email(
+            recipient=recipient_email.strip(),
+            invite_codes=generated_codes,
+        )
+
+        if success:
+            for invite_id in generated_invite_ids:
+                db.add(InviteDelivery(invite_id=invite_id, recipient_email=recipient_email.strip()))
+            db.commit()
+
+            return RedirectResponse(
+                url="/admin?success=Generated+invite+code+and+emailed+it",
+                status_code=status.HTTP_302_FOUND
+            )
+
+        return RedirectResponse(
+            url=f"/admin?error=Generated+codes+but+email+failed:+{error_msg}",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    return RedirectResponse(
+        url="/admin?success=Generated+invite+code",
+        status_code=status.HTTP_302_FOUND
+    )
+
+
+@app.post("/admin/invites/{invite_id}/invalidate")
+async def admin_invalidate_invite(
+    invite_id: int,
+    _: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Invalidate an unused invite code."""
+    invite = db.query(Invite).filter(Invite.id == invite_id).first()
+    if not invite:
+        return RedirectResponse(
+            url="/admin?error=Invite+not+found",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    if invite.is_used:
+        return RedirectResponse(
+            url="/admin?error=Cannot+invalidate+a+used+invite",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    db.delete(invite)
+    db.commit()
+
+    return RedirectResponse(
+        url="/admin?success=Invite+invalidated",
+        status_code=status.HTTP_302_FOUND
+    )
+
+
+@app.post("/admin/users")
+async def admin_create_user(
+    username: str = Form(...),
+    password: str = Form(...),
+    _: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Create a user as admin (without invite code)."""
+    username = username.strip()
+
+    if len(username) < 3:
+        return RedirectResponse(
+            url="/admin?error=Username+must+be+at+least+3+characters",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    if len(password) < 8:
+        return RedirectResponse(
+            url="/admin?error=Password+must+be+at+least+8+characters",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    existing = db.query(User).filter(User.username == username).first()
+    if existing:
+        return RedirectResponse(
+            url="/admin?error=Username+already+exists",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    user = User(
+        username=username,
+        hashed_password=get_password_hash(password),
+        github_enabled=False,
+        is_active=True,
+    )
+    db.add(user)
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/admin?success=User+{username}+created",
+        status_code=status.HTTP_302_FOUND
+    )
+
+
+@app.post("/admin/users/{user_id}/delete")
+async def admin_delete_user(
+    user_id: int,
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a user account as admin."""
+    if user_id == current_user.id:
+        return RedirectResponse(
+            url="/admin?error=Cannot+delete+your+own+account",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        return RedirectResponse(
+            url="/admin?error=User+not+found",
+            status_code=status.HTTP_302_FOUND
+        )
+
+    username = user.username
+    db.delete(user)
+    db.commit()
+
+    return RedirectResponse(
+        url=f"/admin?success=User+{username}+deleted",
+        status_code=status.HTTP_302_FOUND
+    )
+
+
+@app.post("/data/github-settings")
+async def update_github_settings(
+    request: Request,
+    github_token: str | None = Form(None),
+    repo_owner: str = Form(...),
+    repo_name: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update GitHub integration settings for the current user."""
+    if not repo_owner or not repo_name:
+        return RedirectResponse("/data?github_error=Repository+owner+and+name+are+required", status_code=303)
+
+    current_user.repo_owner = repo_owner
+    current_user.repo_name = repo_name
+    current_user.github_enabled = True
+
+    if github_token and github_token.strip():
+        current_user.encrypted_github_token = encrypt_token(github_token.strip())
+
+    db.commit()
+    return RedirectResponse("/data?github_ok=1", status_code=303)
+
+
 @app.get("/submit", response_class=HTMLResponse)
 async def submit_page(
     request: Request,
     current_user: User = Depends(get_current_user)
 ):
-    """Link submission page."""
-    # Get user tags as list of names
-    user_tags = [tag.name for tag in current_user.tags] if current_user.tags else []
-    
-    return templates.TemplateResponse(
-        "submit.html",
-        {
-            "request": request,
-            "user": current_user,
-            "user_tags": sorted(user_tags)
-        }
-    )
+    """Legacy submit route, now merged into dashboard."""
+    return RedirectResponse(url="/dashboard", status_code=status.HTTP_302_FOUND)
 
 
 
@@ -522,15 +749,9 @@ async def submit_link(
     
     # Validate URL
     if not validate_url(url):
-        return templates.TemplateResponse(
-            "submit.html",
-            {
-                "request": request,
-                "user": current_user,
-                "user_tags": sorted(current_user.tags),
-                "error": "Invalid URL format"
-            },
-            status_code=400
+        return RedirectResponse(
+            url="/dashboard?error=Invalid+URL+format",
+            status_code=status.HTTP_302_FOUND
         )
     
     # Parse tags
@@ -567,27 +788,15 @@ async def submit_link(
         
     except DuplicateError:
         LINK_SUBMISSIONS.labels(status='duplicate').inc()
-        return templates.TemplateResponse(
-            "submit.html",
-            {
-                "request": request,
-                "user": current_user,
-                "user_tags": sorted([tag.name for tag in current_user.tags]),
-                "error": "This URL has already been submitted. Check your dashboard."
-            },
-            status_code=409
+        return RedirectResponse(
+            url="/dashboard?error=This+URL+has+already+been+submitted.+Check+your+dashboard.",
+            status_code=status.HTTP_302_FOUND
         )
     except ValidationError as e:
         LINK_SUBMISSIONS.labels(status='failed').inc()
-        return templates.TemplateResponse(
-            "submit.html",
-            {
-                "request": request,
-                "user": current_user,
-                "user_tags": sorted([tag.name for tag in current_user.tags]),
-                "error": str(e)
-            },
-            status_code=400
+        return RedirectResponse(
+            url=f"/dashboard?error={quote_plus(str(e))}",
+            status_code=status.HTTP_302_FOUND
         )
 
 

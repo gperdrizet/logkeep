@@ -18,3 +18,7 @@ class LinkStatus(enum.Enum):
 
 # Import models to ensure they're registered with Base
 from src.models.tag import Tag, link_tags  # noqa: E402, F401
+from src.models.user import User  # noqa: E402, F401
+from src.models.link import Link  # noqa: E402, F401
+from src.models.invite import Invite  # noqa: E402, F401
+from src.models.invite_delivery import InviteDelivery  # noqa: E402, F401

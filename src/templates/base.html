@@ -29,9 +29,11 @@
             </h1>
             <nav>
                 <a href="/dashboard">Links</a>
-                <a href="/submit">Submit</a>
                 <a href="/tags">Tags</a>
                 <a href="/data">Data</a>
+                {% if user.is_admin %}
+                <a href="/admin">Admin</a>
+                {% endif %}
                 <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle dark mode">
                     <span class="theme-icon">Dark</span>
                 </button>

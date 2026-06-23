@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Admin dashboard: LogKeep{% endblock %}
+
+{% block extra_head %}
+<style>
+    main.container {
+        max-width: 1200px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h2>Admin dashboard</h2>
+
+{% if success %}
+<div class="alert alert-success">{{ success }}</div>
+{% endif %}
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<div class="card" style="margin-bottom: 20px;">
+    <h3 class="card-title">Users</h3>
+    {% if users %}
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Username</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Email</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">GitHub</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Total links</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Total tags</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Created</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Last access</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Delete</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for account in users %}
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ account.username }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ account.email }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ 'Yes' if account.github_enabled else 'No' }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); text-align: right;">{{ account.total_links }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); text-align: right;">{{ account.total_tags }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ account.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ account.last_access_at.strftime('%Y-%m-%d %H:%M') if account.last_access_at else 'Never' }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); text-align: right;">
+                        {% if account.id != user.id %}
+                        <form action="/admin/users/{{ account.id }}/delete" method="post" style="display: inline;" onsubmit="return confirm('Delete user {{ account.username }}? This removes all their data.');">
+                            <button type="submit" class="btn" style="background: var(--error-color); color: white;">Delete</button>
+                        </form>
+                        {% else %}
+                        <span style="font-size: 12px; color: var(--link-url-color);">Current</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No users found.</p>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+    <h3 class="card-title">Unused invite codes</h3>
+    {% if invites %}
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Code</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 1px solid var(--border-color);">Sent to</th>
+                    <th style="text-align: right; padding: 10px; border-bottom: 1px solid var(--border-color);">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for invite in invites %}
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); font-family: monospace;">{{ invite.code }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color);">{{ invite.delivery.recipient_email if invite.delivery else 'Not sent' }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-color); text-align: right;">
+                        <form action="/admin/invites/{{ invite.id }}/invalidate" method="post" style="display: inline;"
+                              onsubmit="return confirm('Invalidate invite {{ invite.code }}?');">
+                            <button type="submit" class="btn" style="background: var(--error-color); color: white;">Invalidate</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>No unused invites.</p>
+    {% endif %}
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+    <h3 class="card-title">Generate invite code</h3>
+    <form action="/admin/invites" method="post">
+        <div class="form-group">
+            <label for="recipient-email">Recipient email (optional)</label>
+            <input type="email" id="recipient-email" name="recipient_email" placeholder="new-user@example.com">
+            <small style="color: var(--link-url-color);">If provided, generated invite codes are emailed immediately.</small>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Generate</button>
+    </form>
+</div>
+
+<div class="card" style="margin-bottom: 20px;">
+    <h3 class="card-title">Create user</h3>
+    <form action="/admin/users" method="post">
+        <div class="form-group">
+            <label for="new-username">Username</label>
+            <input type="text" id="new-username" name="username" minlength="3" maxlength="50" required>
+        </div>
+
+        <div class="form-group">
+            <label for="new-password">Password</label>
+            <input type="password" id="new-password" name="password" minlength="8" maxlength="100" required>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Create User</button>
+    </form>
+</div>
+{% endblock %}

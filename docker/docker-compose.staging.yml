@@ -1,40 +1,49 @@
-version: '3.8'
-
 services:
-  # Staging Application
-  app-staging:
-    image: gperdrizet/logkeep:dev
+  postgres:
+    image: postgres:16-alpine
+    container_name: logkeep-postgres-staging
+    restart: unless-stopped
+    env_file:
+      - .env.staging
+    environment:
+      POSTGRES_DB: logkeep_staging
+    volumes:
+      - postgres_data_staging:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-logkeep_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - logkeep-staging-network
+
+  app:
+    build: ..
     container_name: logkeep-staging
     restart: unless-stopped
+    ports:
+      - "100.64.0.1:8003:8000"
     env_file:
       - .env.staging
     environment:
       - GUNICORN_WORKERS=4
       - LOG_LEVEL=debug
-    ports:
-      - "127.0.0.1:8003:8000"
-    volumes:
-      - app_data_staging:/app/data
-      - app_logs_staging:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
     networks:
-      - logkeep-network
-    labels:
-      - "com.logkeep.slot=staging"
-      - "com.logkeep.environment=staging"
+      - logkeep-staging-network
 
 networks:
-  logkeep-network:
-    name: logkeep_logkeep-network
-    external: true  # Uses the network created by docker-compose.prod.yml
+  logkeep-staging-network:
+    driver: bridge
 
 volumes:
-  app_data_staging:
-    driver: local
-  app_logs_staging:
+  postgres_data_staging:
     driver: local

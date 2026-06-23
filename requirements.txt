@@ -35,6 +35,7 @@ python-dotenv==1.0.1
 
 # LLM Integration
 httpx==0.27.0
+openai==1.57.0
 
 # Monitoring
 prometheus-client==0.21.0

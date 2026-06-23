@@ -18,4 +18,5 @@ siderealyear ALL=(ALL) NOPASSWD: /usr/bin/ln -sf /etc/nginx/logkeep-configs/* /e
 siderealyear ALL=(ALL) NOPASSWD: /usr/bin/readlink /etc/nginx/conf.d/logkeep.conf
 siderealyear ALL=(ALL) NOPASSWD: /usr/bin/ls -l /etc/nginx/conf.d/logkeep.conf
 siderealyear ALL=(ALL) NOPASSWD: /usr/bin/cp /opt/logkeep/nginx/*.conf /etc/nginx/logkeep-configs/
+siderealyear ALL=(ALL) NOPASSWD: /usr/bin/cp /opt/logkeep-staging/nginx/staging.conf /etc/nginx/conf.d/staging.conf
 siderealyear ALL=(ALL) NOPASSWD: /usr/bin/cp /opt/logkeep/nginx/*.conf /etc/nginx/conf.d/
