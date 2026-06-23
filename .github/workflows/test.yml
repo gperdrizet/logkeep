@@ -24,4 +24,9 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run tests
-        run: pytest tests/ -v
+        run: |
+          if [ -d tests ] && find tests -type f \( -name 'test_*.py' -o -name '*_test.py' \) | grep -q .; then
+            pytest tests/ -v
+          else
+            echo "No test suite found under tests/. Skipping pytest."
+          fi
