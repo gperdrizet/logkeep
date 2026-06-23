@@ -41,31 +41,21 @@ scrape_configs:
           service: 'postgresql'
           database: 'logkeep'
 
-  # LogKeep Application (Blue)
-  - job_name: 'logkeep-blue'
+  # LogKeep Application (Production)
+  - job_name: 'logkeep-production'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['172.18.0.1:8001']
+      - targets: ['172.18.0.1:8000']
         labels:
           service: 'logkeep'
-          slot: 'blue'
+          slot: 'production'
           environment: 'production'
 
-  # LogKeep Application (Green)
-  - job_name: 'logkeep-green'
-    metrics_path: '/metrics'
-    static_configs:
-      - targets: ['172.18.0.1:8002']
-        labels:
-          service: 'logkeep'
-          slot: 'green'
-          environment: 'production'
-
-  # LogKeep Staging
+  # LogKeep Staging (tailnet endpoint)
   - job_name: 'logkeep-staging'
     metrics_path: '/metrics'
     static_configs:
-      - targets: ['logkeep-staging:8000']
+      - targets: ['100.64.0.1:8003']
         labels:
           service: 'logkeep'
           slot: 'staging'
