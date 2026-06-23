@@ -53,8 +53,8 @@ class Settings(BaseSettings):
     llm_max_output_tokens: int = Field(default=1200, env="LLM_MAX_OUTPUT_TOKENS")
     llm_max_retries: int = Field(default=3, env="LLM_MAX_RETRIES")
     llm_retry_delays: list = Field(default_factory=lambda: [5, 10, 20])
-    llm_temperature: float = Field(default=0.3, env="LLM_TEMPERATURE")
-    summarize_on_submit: bool = Field(default=True, env="SUMMARIZE_ON_SUBMIT")
+    llm_temperature: float = 0.3
+    summarize_on_submit: bool = True
     summary_max_length: int = Field(default=2000)
     
     model_config = SettingsConfigDict(
@@ -72,6 +72,15 @@ class Settings(BaseSettings):
     def is_development(self) -> bool:
         """Check if running in development environment."""
         return str(self.environment).lower() == "development"
+
+    @property
+    def llm_enabled(self) -> bool:
+        """Enable LLM only when the minimum API settings are configured."""
+        return bool(
+            self.llm_base_url.strip()
+            and self.llm_model_name.strip()
+            and self.llm_api_key.strip()
+        )
 
 
 # Global settings instance
