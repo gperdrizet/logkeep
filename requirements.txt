@@ -41,3 +41,6 @@ prometheus-client==0.21.0
 
 # Task Scheduling
 APScheduler==3.10.4
+
+# Testing
+pytest==8.3.3
