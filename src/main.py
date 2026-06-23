@@ -136,7 +136,12 @@ async def startup_event():
         if settings.llm_enabled:
             import httpx
             try:
-                response = httpx.get(f"{settings.llm_base_url}/api/tags", timeout=10)
+                headers = {}
+                if settings.llm_api_key:
+                    headers["Authorization"] = f"Bearer {settings.llm_api_key}"
+
+                base_url = settings.llm_base_url.rstrip("/")
+                response = httpx.get(f"{base_url}/models", headers=headers, timeout=10)
                 response.raise_for_status()
                 logger.info("LLM service ready")
             except Exception as e:

@@ -444,7 +444,7 @@ def backfill_summaries(username):
     from src.utils.logging import logger
     
     if not settings.llm_enabled:
-        click.echo("[FAIL] LLM service is not enabled. Set LLM_ENABLED=true in .env", err=True)
+        click.echo("[FAIL] LLM service is not enabled. Set LLM_BASE_URL, LLM_API_KEY, and LLM_MODEL_NAME in .env", err=True)
         sys.exit(1)
     
     db = SessionLocal()

@@ -12,7 +12,7 @@ LogKeep helps you capture and curate web content from your phone. Submit a link,
 ## Features
 
 - **Mobile-first UI** - Quick submission, minimal typing
-- **AI summarization** - Optional GPU-accelerated article summaries via Ollama
+- **AI summarization** - Optional article summaries via an OpenAI-compatible API
 - **Async processing** - Background extraction and GitHub commits
 - **Tag management** - Personal collections with autocomplete
 - **Multi-user** - Invite-only with encrypted GitHub token storage
@@ -42,7 +42,7 @@ cp docker/.env.example docker/.env
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"  # ENCRYPTION_KEY
 python -c "import secrets; print(secrets.token_urlsafe(32))"  # SESSION_SECRET
 
-# Edit docker/.env with secrets and LLM settings (LLM_ENABLED=true for summarization)
+# Edit docker/.env with secrets and LLM settings
 nano docker/.env
 
 # Start services
@@ -56,25 +56,17 @@ docker exec -it logkeep python -m src.cli.admin create-invite --count 5
 
 Access at `http://localhost:8000`
 
-### GPU Summarization
+### LLM Summarization
 
-Requires NVIDIA GPU with drivers and nvidia-container-toolkit:
+Configure any OpenAI-compatible API in `docker/.env`:
 
 ```bash
-# Install nvidia-container-toolkit
-distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
-curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | sudo apt-key add -
-curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | \
-  sudo tee /etc/apt/sources.list.d/nvidia-docker.list
-sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
-sudo systemctl restart docker
-
-# Enable in docker/.env
-LLM_ENABLED=true
-LLM_BASE_URL=http://ollama:11434
+LLM_BASE_URL=https://your-openai-compatible-endpoint/v1
+LLM_API_KEY=your-llm-api-key-here
+LLM_MODEL_NAME=your-model-name
 ```
 
-The Ollama container will download the model (~807MB) on first start.
+Summarization is enabled automatically when those three values are set.
 
 ## Configuration
 
@@ -86,11 +78,9 @@ SESSION_SECRET=<32+ chars>
 ENCRYPTION_KEY=<Fernet key>
 
 # LLM (optional)
-LLM_ENABLED=true
-LLM_BASE_URL=http://ollama:11434
-LLM_MODEL_NAME=hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF
-LLM_TIMEOUT=180
-SUMMARIZE_ON_SUBMIT=true
+LLM_BASE_URL=https://your-openai-compatible-endpoint/v1
+LLM_API_KEY=your-llm-api-key-here
+LLM_MODEL_NAME=your-model-name
 
 # Limits
 MAX_TAGS_PER_USER=1000
@@ -134,7 +124,7 @@ list-invites --unused                # Show available invites
                 │              ↓
                 │         Title extraction (trafilatura)
                 │              ↓
-                │         Summarization (Ollama/GPU)
+                │         Summarization (OpenAI-compatible API)
                 │              ↓
                 │         PostgreSQL
                 │              ↓
@@ -143,7 +133,7 @@ list-invites --unused                # Show available invites
                            └→ LogSeq journal (link, title, tags, score)
 ```
 
-- **Stack**: FastAPI, SQLAlchemy, PostgreSQL, Jinja2, Ollama, Docker
+- **Stack**: FastAPI, SQLAlchemy, PostgreSQL, Jinja2, OpenAI-compatible LLM API, Docker
 - **Models**: User, Link, Tag, Invite (normalized many-to-many)
 - **Processing**: Async background tasks with retry logic, status tracking
 - **Security**: Bcrypt passwords, Fernet-encrypted GitHub tokens, JWT sessions
