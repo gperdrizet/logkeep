@@ -3,18 +3,18 @@ groups:
   - name: logkeep_alerts
     interval: 30s
     rules:
-      # Production Application Down - only alert if BOTH blue and green are down
+      # Production Application Down
       - alert: ProductionApplicationDown
-        expr: sum(up{job=~"logkeep-(blue|green)"}) == 0
+        expr: up{job="logkeep-production"} == 0
         for: 1m
         labels:
           severity: critical
           component: application
         annotations:
-          summary: "LogKeep production application is completely down"
-          description: "Both blue and green production containers are down. No production service is available."
+          summary: "LogKeep production endpoint is down"
+          description: "Production metrics endpoint has been unavailable for more than 1 minute."
       
-      # Staging Container Down
+      # Staging Endpoint Down
       - alert: StagingContainerDown
         expr: up{job="logkeep-staging"} == 0
         for: 5m
@@ -22,8 +22,8 @@ groups:
           severity: warning
           component: application
         annotations:
-          summary: "LogKeep staging container is down"
-          description: "Staging container has been down for more than 5 minutes."
+          summary: "LogKeep staging endpoint is down"
+          description: "Staging metrics endpoint has been unavailable for more than 5 minutes."
 
       # High CPU Usage
       - alert: HighCPUUsage

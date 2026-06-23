@@ -17,6 +17,14 @@ class Settings(BaseSettings):
     max_tags_per_user: int = Field(default=1000, env="MAX_TAGS_PER_USER")
     max_retries: int = Field(default=3, env="MAX_RETRIES")
     processing_timeout_minutes: int = Field(default=5, env="PROCESSING_TIMEOUT_MINUTES")
+    admin_usernames: str = Field(default="", env="ADMIN_USERNAMES")
+
+    # Email / SMTP
+    smtp_host: str = Field(default="", env="SMTP_HOST")
+    smtp_port: int = Field(default=587, env="SMTP_PORT")
+    smtp_user: str = Field(default="", env="SMTP_USER")
+    smtp_password: str = Field(default="", env="SMTP_PASSWORD")
+    smtp_from: str = Field(default="", env="SMTP_FROM")
     
     # Logging
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
@@ -35,13 +43,15 @@ class Settings(BaseSettings):
     # Content extraction
     request_timeout: int = Field(default=10, env="REQUEST_TIMEOUT")
     
-    # LLM Configuration (OpenAI-compatible API)
-    llm_base_url: str = Field(default="https://api.openai.com/v1", env="LLM_BASE_URL")
+    # LLM Configuration
+    llm_enabled: bool = Field(default=False, env="LLM_ENABLED")
+    llm_base_url: str = Field(default="http://ollama:11434", env="LLM_BASE_URL")
     llm_api_key: str = Field(default="", env="LLM_API_KEY")
-    llm_model_name: str = Field(default="gpt-4o-mini", env="LLM_MODEL_NAME")
-    llm_timeout: int = 180
-    llm_max_input_tokens: int = 4000
-    llm_max_retries: int = 3
+    llm_model_name: str = Field(default="hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF", env="LLM_MODEL_NAME")
+    llm_timeout: int = Field(default=180, env="LLM_TIMEOUT")
+    llm_max_input_tokens: int = Field(default=12000, env="LLM_MAX_INPUT_TOKENS")
+    llm_max_output_tokens: int = Field(default=1200, env="LLM_MAX_OUTPUT_TOKENS")
+    llm_max_retries: int = Field(default=3, env="LLM_MAX_RETRIES")
     llm_retry_delays: list = Field(default_factory=lambda: [5, 10, 20])
     llm_temperature: float = 0.3
     summarize_on_submit: bool = True

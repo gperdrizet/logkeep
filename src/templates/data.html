@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Data - LogKeep{% endblock %}
+{% block title %}Data: LogKeep{% endblock %}
 
 {% block content %}
 <h2>Data</h2>
@@ -30,6 +30,53 @@
             </div>
             {% endfor %}
         </div>
+    </div>
+</div>
+
+<div style="margin-top: 32px;">
+    <div class="card">
+        <h3 class="card-title">GitHub and Logseq integration</h3>
+
+        {% if request.query_params.get('github_ok') %}
+        <div class="alert alert-success">Settings saved.</div>
+        {% endif %}
+        {% if request.query_params.get('github_error') %}
+        <div class="alert alert-error">{{ request.query_params.get('github_error') }}</div>
+        {% endif %}
+
+        {% if user.github_enabled %}
+        <p style="margin-bottom: 16px; color: var(--link-url-color); font-size: 14px;">
+            Currently connected to <strong>{{ user.repo_owner }}/{{ user.repo_name }}</strong>.
+            Leave the token field blank to keep the existing token.
+        </p>
+        {% else %}
+        <p style="margin-bottom: 16px; color: var(--link-url-color); font-size: 14px;">
+            Connect a GitHub repository to automatically commit links to your Logseq graph.
+        </p>
+        {% endif %}
+
+        <form action="/data/github-settings" method="post">
+            <div class="form-group">
+                <label for="github_token">Personal access token</label>
+                <input type="password" id="github_token" name="github_token" placeholder="github_pat_…">
+                <small style="color: var(--link-url-color);">
+                    <a href="https://github.com/settings/tokens" target="_blank">Generate token</a>
+                    with <strong>Contents</strong> (read/write) and <strong>Metadata</strong> (read) permissions.
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="repo_owner">Repository owner</label>
+                <input type="text" id="repo_owner" name="repo_owner" value="{{ user.repo_owner or '' }}" placeholder="your-username" required>
+            </div>
+
+            <div class="form-group">
+                <label for="repo_name">Repository name</label>
+                <input type="text" id="repo_name" name="repo_name" value="{{ user.repo_name or '' }}" placeholder="my-logseq-graph" required>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save</button>
+        </form>
     </div>
 </div>
 

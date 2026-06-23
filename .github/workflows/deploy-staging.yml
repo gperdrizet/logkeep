@@ -1,19 +1,12 @@
-name: Deploy to Staging
+name: Deploy Staging
 
 on:
-  # Auto-deploy on pull request to main branch (for testing before production)
-  pull_request:
-    branches:
-      - main
-    types: [opened, synchronize, reopened]
-  
-  # Allow manual deployment with custom image tag
   workflow_dispatch:
-    inputs:
-      image_tag:
-        description: 'Docker image tag to deploy to staging'
-        required: false
-        default: 'dev'
+  push:
+    branches: [main]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   deploy-staging:
@@ -21,81 +14,49 @@ jobs:
     environment: staging
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set image tag
-        id: set-tag
+      - name: Deploy to staging
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          HOST: ${{ secrets.VPS_HOST }}
+          USER: ${{ secrets.VPS_USER }}
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "IMAGE_TAG=${{ github.event.inputs.image_tag }}" >> $GITHUB_ENV
+          KEY_FILE=$(mktemp)
+          chmod 600 "$KEY_FILE"
+          echo "$SSH_KEY" > "$KEY_FILE"
+
+          ssh -i "$KEY_FILE" \
+            -p 44441 \
+            -o StrictHostKeyChecking=no \
+            -o BatchMode=yes \
+            "$USER@$HOST" bash -s << 'REMOTE'
+          set -euo pipefail
+
+          DEPLOY_DIR=/opt/logkeep-staging
+          if [ ! -d "$DEPLOY_DIR/.git" ]; then
+            git clone https://github.com/gperdrizet/logkeep.git "$DEPLOY_DIR"
           else
-            echo "IMAGE_TAG=dev" >> $GITHUB_ENV
+            git -C "$DEPLOY_DIR" pull --ff-only
           fi
 
-      - name: Setup SSH key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          cd "$DEPLOY_DIR"
 
-      - name: Add VPS to known hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H -p 44441 ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          # Remove any leftover containers from previous/failed deploys.
+          # Match exact names to avoid accidental removals.
+          docker ps -a --format '{{.Names}}' | grep -E '^logkeep(-postgres)?-staging$' || true
+          docker ps -aq --filter name='^/logkeep-staging$' | xargs -r docker rm -f
+          docker ps -aq --filter name='^/logkeep-postgres-staging$' | xargs -r docker rm -f
 
-      - name: Deploy to Staging
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          IMAGE_TAG: ${{ env.IMAGE_TAG }}
-        run: |
-          ssh -p 44441 $VPS_USER@$VPS_HOST "cd /opt/logkeep && \
-            echo 'Deploying to staging...' && \
-            docker pull gperdrizet/logkeep:${IMAGE_TAG} && \
-            docker-compose -p logkeep --env-file docker/.env.staging -f docker/docker-compose.staging.yml down && \
-            docker-compose -p logkeep --env-file docker/.env.staging -f docker/docker-compose.staging.yml up -d && \
-            echo 'Staging deployment completed!'"
+          COMPOSE_PROJECT_NAME=logkeep-staging docker compose \
+            -f docker/docker-compose.staging.yml \
+            up --build -d --remove-orphans
 
-      - name: Wait for staging to be ready
-        run: sleep 15
+          sleep 15
 
-      - name: Run smoke tests
-        env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-        run: |
-          ssh -p 44441 $VPS_USER@$VPS_HOST << 'EOF'
-            # Test health endpoint from host
-            if curl -f http://localhost:8003/health > /dev/null 2>&1; then
-              echo "[OK] Staging health check passed"
-            else
-              echo "[FAIL] Staging health check failed"
-              docker logs --tail 20 logkeep-staging
-              exit 1
-            fi
-            
-            # Test database connectivity
-            if docker exec logkeep-staging python -c "from src.utils.database import get_db; next(get_db())" > /dev/null 2>&1; then
-              echo "[OK] Database connectivity OK"
-            else
-              echo "[WARN]  Database connectivity test skipped or failed"
-            fi
-          EOF
+          # Initialize database tables (idempotent, safe to run on every deploy)
+          docker exec logkeep-staging python -m src.cli.admin init-db
 
-      - name: Summary
-        if: always()
-        run: |
-          if [ "${{ job.status }}" == "success" ]; then
-            echo "### [OK] Staging Deployment Successful!" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Image:** \`${{ env.IMAGE_TAG }}\`" >> $GITHUB_STEP_SUMMARY
-            echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo " Staging is ready for testing" >> $GITHUB_STEP_SUMMARY
-            echo " Access staging at: http://${{ secrets.VPS_HOST }}:8003" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "### [FAIL] Staging Deployment Failed!" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Check the logs above for details" >> $GITHUB_STEP_SUMMARY
-          fi
+          curl -fsS http://100.64.0.1:8003/health | grep '"status"'
+          echo "Staging deploy OK"
+          REMOTE
+
+          rm -f "$KEY_FILE"
