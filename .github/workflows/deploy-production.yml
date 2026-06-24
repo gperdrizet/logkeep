@@ -72,6 +72,14 @@ jobs:
             exit 1
           fi
 
+          # Clean up stale containers that may exist outside the current compose project.
+          # This avoids name conflicts with fixed container_name values in production compose.
+          for name in logkeep-postgres logkeep-postgres-exporter logkeep; do
+            if docker ps -a --format '{{.Names}}' | grep -Fxq "$name"; then
+              docker rm -f "$name"
+            fi
+          done
+
           docker compose \
             -f docker/docker-compose.prod.yml \
             up --build -d --remove-orphans
