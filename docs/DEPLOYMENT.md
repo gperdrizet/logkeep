@@ -92,11 +92,12 @@ nano .env.production
 
 Fill in:
 - `POSTGRES_PASSWORD` - from generated_secrets.txt
-- `SECRET_KEY` - from generated_secrets.txt
+- `SESSION_SECRET` - from generated_secrets.txt
 - `ENCRYPTION_KEY` - from generated_secrets.txt
 - `GRAFANA_ADMIN_PASSWORD` - from generated_secrets.txt
-- `GITHUB_TOKEN` - your GitHub PAT
 - `SMTP_PASSWORD` - your Ionos email password
+
+GitHub personal access tokens are entered per user in the app and stored encrypted in the database. They are not configured in `.env.production`.
 
 ### Step 6: copy nginx configurations
 

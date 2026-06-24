@@ -51,8 +51,12 @@ generate_password() {
     openssl rand -base64 32 | tr -d "=+/" | cut -c1-25
 }
 
-generate_secret_key() {
+generate_session_secret() {
     openssl rand -hex 32
+}
+
+generate_fernet_key() {
+    python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 }
 
 # =============================================================================
@@ -192,7 +196,8 @@ setup_directories() {
 generate_secrets() {
     log_info "Generating application secrets..."
     
-    SECRET_KEY=$(generate_secret_key)
+    SESSION_SECRET=$(generate_session_secret)
+    ENCRYPTION_KEY=$(generate_fernet_key)
     DB_PASSWORD=$(generate_password)
     ADMIN_PASSWORD=$(generate_password)
     
@@ -202,7 +207,8 @@ generate_secrets() {
 # Generated on: $(date)
 # IMPORTANT: Save these securely and delete this file after copying!
 
-SECRET_KEY=$SECRET_KEY
+SESSION_SECRET=$SESSION_SECRET
+ENCRYPTION_KEY=$ENCRYPTION_KEY
 DB_PASSWORD=$DB_PASSWORD
 ADMIN_PASSWORD=$ADMIN_PASSWORD
 
