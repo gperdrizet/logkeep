@@ -29,8 +29,7 @@ help:
 	@echo "  make prod         - Start production environment"
 	@echo "  make prod-logs    - View production logs (follow)"
 	@echo "  make prod-down    - Stop production environment"
-	@echo "  make prod-blue-logs  - View blue container logs"
-	@echo "  make prod-green-logs - View green container logs"
+	@echo "  make prod-shell   - Shell access to production container"
 	@echo ""
 	@echo "Database:"
 	@echo "  make db-backup    - Backup production database"
@@ -39,8 +38,8 @@ help:
 	@echo "  make db-staging-shell - PostgreSQL shell (staging)"
 	@echo ""
 	@echo "Deployment (VPS):"
-	@echo "  make deploy       - Deploy to production (blue/green)"
-	@echo "  make rollback     - Rollback production deployment"
+	@echo "  make deploy       - Deploy current checkout to production"
+	@echo "  make rollback     - Roll back to a previous git ref"
 	@echo ""
 	@echo "Utility:"
 	@echo "  make setup        - Create .env files from templates"
@@ -61,7 +60,7 @@ dev:
 	@echo "[OK] Development environment running"
 	@echo "     App:      http://localhost:8000"
 	@echo "     Postgres: localhost:5432"
-	@echo "     Ollama:   http://localhost:11434"
+	@echo "     LLM API:  set via docker/.env"
 
 dev-logs:
 	docker-compose -f $(DOCKER_DIR)/docker-compose.yml logs -f
@@ -90,8 +89,7 @@ staging:
 	docker-compose -p logkeep --env-file $(DOCKER_DIR)/.env.staging -f $(DOCKER_DIR)/docker-compose.staging.yml up -d
 	@sleep 5
 	@echo "[OK] Staging environment running"
-	@echo "     App:    http://localhost:8003"
-	@echo "     Access: https://staging.perdrizet.org (basic auth required)"
+	@echo "     App:    http://100.64.0.1:8003"
 
 staging-logs:
 	docker-compose -p logkeep --env-file $(DOCKER_DIR)/.env.staging -f $(DOCKER_DIR)/docker-compose.staging.yml logs -f
@@ -113,24 +111,19 @@ prod:
 	@echo "[INFO] Starting production environment..."
 	docker-compose -p logkeep --env-file $(DOCKER_DIR)/.env.production -f $(DOCKER_DIR)/docker-compose.prod.yml up -d
 	@echo "[OK] Production environment running"
-	@echo "     Blue:    http://localhost:8001"
-	@echo "     Green:   http://localhost:8002"
-	@echo "     Access:  https://logkeep.perdrizet.org"
-	@echo "     Grafana: https://grafana.perdrizet.org"
+	@echo "     App:     http://127.0.0.1:8000"
 
 prod-logs:
-	docker-compose -p logkeep --env-file $(DOCKER_DIR)/.env.production -f $(DOCKER_DIR)/docker-compose.prod.yml logs -f app-blue app-green
+	docker-compose -p logkeep --env-file $(DOCKER_DIR)/.env.production -f $(DOCKER_DIR)/docker-compose.prod.yml logs -f app
 
 prod-down:
 	@echo "[INFO] Stopping production environment..."
 	docker-compose -p logkeep --env-file $(DOCKER_DIR)/.env.production -f $(DOCKER_DIR)/docker-compose.prod.yml down
 	@echo "[OK] Production environment stopped"
 
-prod-blue-logs:
-	docker logs -f logkeep-blue
-
-prod-green-logs:
-	docker logs -f logkeep-green
+prod-shell:
+	@echo "[INFO] Opening shell in production container..."
+	docker exec -it logkeep /bin/bash
 
 # ============================================================================
 # Database Management
@@ -152,7 +145,7 @@ db-shell:
 
 db-staging-shell:
 	@echo "[INFO] Opening PostgreSQL shell (staging database)..."
-	docker exec -it logkeep-postgres psql -U logkeep_admin -d logkeep_staging
+	docker exec -it logkeep-postgres-staging psql -U logkeep_admin -d logkeep_staging
 
 # ============================================================================
 # Utility Commands
@@ -194,9 +187,9 @@ logs:
 # ============================================================================
 
 deploy:
-	@echo "[INFO] Deploying to production with blue/green strategy..."
+	@echo "[INFO] Deploying to production..."
 	@if [ -f ./scripts/deploy.sh ]; then \
-		./scripts/deploy.sh latest; \
+		./scripts/deploy.sh; \
 	else \
 		echo "[ERROR] deploy.sh script not found"; \
 		exit 1; \
@@ -204,8 +197,12 @@ deploy:
 
 rollback:
 	@echo "[INFO] Rolling back production deployment..."
+	@if [ -z "$(ROLLBACK_REF)" ]; then \
+		echo "[ERROR] Set ROLLBACK_REF, e.g. make rollback ROLLBACK_REF=v1.2.3"; \
+		exit 1; \
+	fi
 	@if [ -f ./scripts/rollback.sh ]; then \
-		./scripts/rollback.sh; \
+		./scripts/rollback.sh "$(ROLLBACK_REF)"; \
 	else \
 		echo "[ERROR] rollback.sh script not found"; \
 		exit 1; \
@@ -222,13 +219,10 @@ health:
 	@curl -s http://localhost:8000/health 2>/dev/null && echo "" || echo "  [ERROR] Not running"
 	@echo ""
 	@echo "Staging:"
-	@curl -s http://localhost:8003/health 2>/dev/null && echo "" || echo "  [ERROR] Not running"
+	@curl -s http://100.64.0.1:8003/health 2>/dev/null && echo "" || echo "  [ERROR] Not running"
 	@echo ""
-	@echo "Production (Blue):"
-	@curl -s http://localhost:8001/health 2>/dev/null && echo "" || echo "  [ERROR] Not running"
-	@echo ""
-	@echo "Production (Green):"
-	@curl -s http://localhost:8002/health 2>/dev/null && echo "" || echo "  [ERROR] Not running"
+	@echo "Production:"
+	@curl -s http://127.0.0.1:8000/health 2>/dev/null && echo "" || echo "  [ERROR] Not running"
 
 # ============================================================================
 # Testing (not yet implemented)

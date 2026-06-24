@@ -246,8 +246,8 @@
       },
       "targets": [
         {
-          "expr": "label_replace(\n  label_replace(\n    label_replace(\n      container_memory_usage_bytes{id=~\"/system.slice/docker-(1f5a097f63a8|216ab1029694|3d41bc717701).*\"},\n      \"container_name\", \"app-green\", \"id\", \"/system.slice/docker-1f5a097f63a8.*\"\n    ),\n    \"container_name\", \"app-staging\", \"id\", \"/system.slice/docker-216ab1029694.*\"\n  ),\n  \"container_name\", \"postgres\", \"id\", \"/system.slice/docker-3d41bc717701.*\"\n)",
-          "legendFormat": "{{container_name}}",
+          "expr": "container_memory_usage_bytes{container_label_com_docker_compose_service=~\"app|postgres\",container_label_com_docker_compose_project=~\"docker|logkeep-staging\"}",
+          "legendFormat": "{{container_label_com_docker_compose_project}}/{{container_label_com_docker_compose_service}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
@@ -292,8 +292,8 @@
       },
       "targets": [
         {
-          "expr": "label_replace(\n  label_replace(\n    label_replace(\n      rate(container_cpu_usage_seconds_total{id=~\"/system.slice/docker-(1f5a097f63a8|216ab1029694|3d41bc717701).*\"}[5m]) * 100,\n      \"container_name\", \"app-green\", \"id\", \"/system.slice/docker-1f5a097f63a8.*\"\n    ),\n    \"container_name\", \"app-staging\", \"id\", \"/system.slice/docker-216ab1029694.*\"\n  ),\n  \"container_name\", \"postgres\", \"id\", \"/system.slice/docker-3d41bc717701.*\"\n)",
-          "legendFormat": "{{container_name}}",
+          "expr": "rate(container_cpu_usage_seconds_total{container_label_com_docker_compose_service=~\"app|postgres\",container_label_com_docker_compose_project=~\"docker|logkeep-staging\"}[5m]) * 100",
+          "legendFormat": "{{container_label_com_docker_compose_project}}/{{container_label_com_docker_compose_service}}",
           "refId": "A",
           "datasource": {
             "type": "prometheus",
