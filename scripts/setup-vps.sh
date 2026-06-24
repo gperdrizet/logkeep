@@ -51,7 +51,7 @@ generate_password() {
     openssl rand -base64 32 | tr -d "=+/" | cut -c1-32
 }
 
-generate_secret_key() {
+generate_session_secret() {
     openssl rand -hex 32
 }
 
@@ -175,7 +175,7 @@ generate_secrets() {
     log_info "Generating secrets..."
     
     POSTGRES_PASSWORD=$(generate_password)
-    SECRET_KEY=$(generate_secret_key)
+    SESSION_SECRET=$(generate_session_secret)
     ENCRYPTION_KEY=$(generate_fernet_key)
     GRAFANA_PASSWORD=$(generate_password)
     
@@ -185,7 +185,7 @@ generate_secrets() {
 # DO NOT COMMIT THIS FILE TO VERSION CONTROL
 
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
-SECRET_KEY=$SECRET_KEY
+SESSION_SECRET=$SESSION_SECRET
 ENCRYPTION_KEY=$ENCRYPTION_KEY
 GRAFANA_ADMIN_PASSWORD=$GRAFANA_PASSWORD
 EOF
@@ -209,9 +209,8 @@ create_env_template() {
 
 POSTGRES_USER=logkeep_admin
 POSTGRES_PASSWORD=REPLACE_WITH_GENERATED_PASSWORD
-SECRET_KEY=REPLACE_WITH_GENERATED_SECRET
+SESSION_SECRET=REPLACE_WITH_GENERATED_SECRET
 ENCRYPTION_KEY=REPLACE_WITH_GENERATED_FERNET_KEY
-GITHUB_TOKEN=REPLACE_WITH_YOUR_GITHUB_TOKEN
 GRAFANA_ADMIN_PASSWORD=REPLACE_WITH_GENERATED_PASSWORD
 SMTP_PASSWORD=REPLACE_WITH_YOUR_IONOS_SMTP_PASSWORD
 EOF

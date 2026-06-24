@@ -84,9 +84,19 @@ jobs:
             -f docker/docker-compose.prod.yml \
             up --build -d --remove-orphans
 
-          sleep 10
-          curl -fsS http://127.0.0.1:8000/health | grep '"status"'
-          echo "Production deploy OK"
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/health | grep '"status"'; then
+              echo "Production deploy OK"
+              exit 0
+            fi
+
+            sleep 2
+          done
+
+          echo "Production health check failed after waiting for startup"
+          docker compose -f docker/docker-compose.prod.yml ps
+          docker compose -f docker/docker-compose.prod.yml logs --tail=200 app
+          exit 1
           REMOTE
 
           rm -f "$KEY_FILE"
