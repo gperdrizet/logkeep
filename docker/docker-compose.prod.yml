@@ -49,8 +49,9 @@ services:
     env_file:
       - .env.production
     environment:
-      - GUNICORN_WORKERS=9
+      - GUNICORN_WORKERS=2
       - LOG_LEVEL=info
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
     depends_on:
       postgres:
         condition: service_healthy
