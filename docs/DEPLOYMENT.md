@@ -57,6 +57,17 @@ Post-deploy verification:
 curl -fsS http://127.0.0.1:8000/health
 ```
 
+## Nginx Configuration
+
+`nginx/*.conf` are source-of-truth files in this repo but are **not** deployed
+by CI/CD — the VPS runs system nginx, not a containerized one. After changing
+a file under `nginx/`, apply it manually on the VPS:
+
+```bash
+sudo cp nginx/logkeep.conf /etc/nginx/conf.d/logkeep.conf
+sudo nginx -t && sudo systemctl reload nginx
+```
+
 ## First-Time Database Bootstrap
 
 Run once per new environment database:
