@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from dotenv import load_dotenv
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry, multiprocess
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -110,6 +110,12 @@ app.include_router(health.router)
 @app.get("/metrics")
 async def metrics():
     """Prometheus metrics endpoint."""
+    # Gunicorn runs multiple worker processes; without this, a scrape only
+    # ever sees whichever single worker happened to answer it.
+    if os.getenv("PROMETHEUS_MULTIPROC_DIR"):
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return Response(content=generate_latest(registry), media_type=CONTENT_TYPE_LATEST)
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 

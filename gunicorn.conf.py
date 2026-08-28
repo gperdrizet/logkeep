@@ -1,22 +1,23 @@
 """
 Gunicorn Configuration File for LogKeep Production
 
-This configuration is optimized for a 4-core VPS running blue/green deployments.
-Worker count: (2 × CPU cores) + 1 = 9 workers
+The VPS is shared with several other services, and LogKeep's real traffic is
+low (a handful of users). Worker count is kept small to conserve host memory
+rather than following the (2 x CPU cores) + 1 formula meant for busy servers.
 
 For more configuration options, see:
 https://docs.gunicorn.org/en/stable/settings.html
 """
 
-import multiprocessing
 import os
+import shutil
 
 # Server Socket
 bind = "0.0.0.0:8000"
 backlog = 2048
 
 # Worker Processes
-workers = int(os.getenv("GUNICORN_WORKERS", "9"))
+workers = int(os.getenv("GUNICORN_WORKERS", "2"))
 worker_class = "uvicorn.workers.UvicornWorker"
 worker_connections = 1000
 max_requests = 1000  # Recycle workers to prevent memory leaks
@@ -51,6 +52,20 @@ def on_starting(server):
     server.log.info(f"Workers: {workers}")
     server.log.info(f"Worker class: {worker_class}")
     server.log.info(f"Binding to: {bind}")
+
+    # Stale multiprocess metric files from a previous container run would
+    # double-count against still-live PIDs, so start with a clean directory.
+    multiproc_dir = os.getenv("PROMETHEUS_MULTIPROC_DIR")
+    if multiproc_dir:
+        shutil.rmtree(multiproc_dir, ignore_errors=True)
+        os.makedirs(multiproc_dir, exist_ok=True)
+
+
+def child_exit(server, worker):
+    """Called just after a worker has been exited, in the master process."""
+    if os.getenv("PROMETHEUS_MULTIPROC_DIR"):
+        from prometheus_client import multiprocess
+        multiprocess.mark_process_dead(worker.pid)
 
 
 def on_reload(server):
