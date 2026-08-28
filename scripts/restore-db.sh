@@ -128,11 +128,11 @@ if [ "$TARGET_DB" == "logkeep" ]; then
     echo ""
     echo "IMPORTANT: After restoring production database, you should:"
     echo "  1. Restart application containers:"
-    echo "     docker-compose -f docker-compose.prod.yml restart app-blue app-green"
+    echo "     docker compose -f docker/docker-compose.prod.yml restart app"
     echo "  2. Verify application health:"
-    echo "     curl https://logkeep.perdrizet.org/health"
+    echo "     curl http://127.0.0.1:8000/health"
     echo "  3. Check application logs:"
-    echo "     docker-compose -f docker-compose.prod.yml logs -f app-blue"
+    echo "     docker compose -f docker/docker-compose.prod.yml logs -f app"
 fi
 
 exit 0

@@ -1,22 +1,18 @@
 #!/bin/bash
 # =============================================================================
-# LogKeep Rollback Script
+# LogKeep Production Rollback Script
 # =============================================================================
-# Quickly rollback to the previous deployment by switching traffic back
+# Rolls production back to a previous git ref and redeploys compose services.
 #
-# Usage: ./rollback.sh
+# Usage: ./scripts/rollback.sh <git_ref>
+# Example: ./scripts/rollback.sh v1.2.3
 # =============================================================================
 
-set -e
+set -euo pipefail
 
-# Color output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
 NC='\033[0m'
-
-# Configuration
-NGINX_CONF="/etc/nginx/conf.d/logkeep.conf"
 
 log_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
@@ -26,114 +22,66 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-log_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
+if [ $# -lt 1 ]; then
+    log_error "Usage: $0 <git_ref>"
+    exit 1
+fi
 
-get_active_slot() {
-    # Check which container Nginx is pointing to
-    if grep -q "server logkeep-blue:8000" "$NGINX_CONF"; then
-        echo "blue"
-    elif grep -q "server logkeep-green:8000" "$NGINX_CONF"; then
-        echo "green"
-    else
-        echo "unknown"
+ROLLBACK_REF="$1"
+
+if [ ! -d .git ]; then
+    log_error "Run this script from repository root"
+    exit 1
+fi
+
+if [ ! -f "docker/docker-compose.prod.yml" ]; then
+    log_error "Missing docker/docker-compose.prod.yml"
+    exit 1
+fi
+
+if [ ! -f "docker/.env.production" ]; then
+    log_error "Missing docker/.env.production"
+    exit 1
+fi
+
+log_info "Fetching latest refs"
+git fetch --prune origin
+
+log_info "Checking out ${ROLLBACK_REF}"
+git checkout -f "$ROLLBACK_REF"
+
+log_info "Validating compose file"
+docker compose --env-file docker/.env.production -f docker/docker-compose.prod.yml config >/dev/null
+
+log_info "Re-deploying production stack"
+docker compose --env-file docker/.env.production -f docker/docker-compose.prod.yml up --build -d --remove-orphans
+
+log_info "Ensuring database schema exists"
+init_ok=0
+for _ in $(seq 1 20); do
+    if docker exec logkeep python -m src.cli.admin init-db >/dev/null 2>&1; then
+        init_ok=1
+        break
     fi
-}
+    sleep 2
+done
 
-get_inactive_slot() {
-    local active=$(get_active_slot)
-    if [ "$active" = "blue" ]; then
-        echo "green"
-    elif [ "$active" = "green" ]; then
-        echo "blue"
-    else
-        echo "unknown"
+if [ "$init_ok" -ne 1 ]; then
+    log_error "Database initialization failed after retries"
+    docker compose --env-file docker/.env.production -f docker/docker-compose.prod.yml logs --tail=200 app
+    exit 1
+fi
+
+log_info "Verifying health endpoint"
+for _ in $(seq 1 30); do
+    if curl -fsS http://127.0.0.1:8000/health | grep -q '"status"'; then
+        log_info "Rollback completed successfully"
+        exit 0
     fi
-}
+    sleep 2
+done
 
-check_container_exists() {
-    local container=$1
-    docker ps -a --filter "name=$container" --format "{{.Names}}" | grep -q "$container"
-}
-
-start_container_if_stopped() {
-    local container=$1
-    
-    if ! docker ps --filter "name=$container" --filter "status=running" --format "{{.Names}}" | grep -q "$container"; then
-        log_info "Starting $container..."
-        docker start "$container"
-        sleep 5
-    fi
-}
-
-switch_nginx_upstream() {
-    local new_slot=$1
-    local new_container="logkeep-${new_slot}"
-    
-    log_info "Switching Nginx upstream to $new_slot..."
-    
-    sudo sed -i "s/server logkeep-[a-z]*:8000;/server ${new_container}:8000;/" "$NGINX_CONF"
-    
-    if ! sudo nginx -t; then
-        log_error "Nginx configuration test failed!"
-        return 1
-    fi
-    
-    sudo nginx -s reload
-    log_info "Nginx reloaded successfully"
-}
-
-main() {
-    log_warn "=========================================="
-    log_warn "LogKeep Rollback"
-    log_warn "=========================================="
-    
-    local current_slot=$(get_active_slot)
-    local previous_slot=$(get_inactive_slot)
-    
-    log_info "Current active slot: $current_slot"
-    log_info "Rolling back to: $previous_slot"
-    
-    if [ "$previous_slot" = "unknown" ]; then
-        log_error "Cannot determine previous slot"
-        exit 1
-    fi
-    
-    local previous_container="logkeep-${previous_slot}"
-    
-    # Check if previous container exists
-    if ! check_container_exists "$previous_container"; then
-        log_error "Previous container $previous_container not found"
-        log_error "Cannot rollback - container may have been removed"
-        exit 1
-    fi
-    
-    # Start previous container if stopped
-    start_container_if_stopped "$previous_container"
-    
-    # Wait for health check
-    log_info "Waiting for $previous_container to be ready..."
-    for i in {1..10}; do
-        if docker exec "$previous_container" curl -f http://localhost:8000/health > /dev/null 2>&1; then
-            log_info "$previous_container is healthy!"
-            break
-        fi
-        if [ $i -eq 10 ]; then
-            log_error "$previous_container health check failed"
-            exit 1
-        fi
-        sleep 3
-    done
-    
-    # Switch traffic
-    switch_nginx_upstream "$previous_slot"
-    
-    log_warn "=========================================="
-    log_warn "Rollback completed!"
-    log_warn "=========================================="
-    log_info "Traffic switched from $current_slot to $previous_slot"
-    log_info "Monitor the application and stop the problematic container if needed"
-}
-
-main
+log_error "Rollback health check failed"
+docker compose --env-file docker/.env.production -f docker/docker-compose.prod.yml ps
+docker compose --env-file docker/.env.production -f docker/docker-compose.prod.yml logs --tail=200 app
+exit 1

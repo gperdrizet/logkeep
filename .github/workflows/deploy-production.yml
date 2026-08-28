@@ -66,7 +66,7 @@ jobs:
 
           cd "$DEPLOY_DIR"
 
-          if ! docker compose -f docker/docker-compose.prod.yml config >/dev/null; then
+          if ! docker compose --env-file docker/.env.production -f docker/docker-compose.prod.yml config >/dev/null; then
             echo "docker-compose.prod.yml failed validation on VPS"
             nl -ba docker/docker-compose.prod.yml | sed -n '1,120p'
             exit 1
@@ -81,8 +81,26 @@ jobs:
           done
 
           docker compose \
+            --env-file docker/.env.production \
             -f docker/docker-compose.prod.yml \
             up --build -d --remove-orphans
+
+          # Initialize database schema (idempotent).
+          init_ok=0
+          for attempt in $(seq 1 20); do
+            if docker exec logkeep python -m src.cli.admin init-db; then
+              init_ok=1
+              break
+            fi
+
+            sleep 2
+          done
+
+          if [ "$init_ok" -ne 1 ]; then
+            echo "Database initialization failed after retries"
+            docker compose --env-file docker/.env.production -f docker/docker-compose.prod.yml logs --tail=200 app
+            exit 1
+          fi
 
           for attempt in $(seq 1 30); do
             if curl -fsS http://127.0.0.1:8000/health | grep '"status"'; then
@@ -94,8 +112,8 @@ jobs:
           done
 
           echo "Production health check failed after waiting for startup"
-          docker compose -f docker/docker-compose.prod.yml ps
-          docker compose -f docker/docker-compose.prod.yml logs --tail=200 app
+          docker compose --env-file docker/.env.production -f docker/docker-compose.prod.yml ps
+          docker compose --env-file docker/.env.production -f docker/docker-compose.prod.yml logs --tail=200 app
           exit 1
           REMOTE
 

@@ -3,127 +3,114 @@
 [![Deploy to Staging](https://github.com/gperdrizet/logkeep/actions/workflows/deploy-staging.yml/badge.svg)](https://github.com/gperdrizet/logkeep/actions/workflows/deploy-staging.yml)
 [![Deploy to Production](https://github.com/gperdrizet/logkeep/actions/workflows/deploy-production.yml/badge.svg)](https://github.com/gperdrizet/logkeep/actions/workflows/deploy-production.yml)
 
-Link curation with AI summarization and LogSeq integration via GitHub.
+LogKeep is an invite-only link curation app that extracts page content, applies optional LLM summarization, and writes structured entries to each user's configured GitHub repository.
 
-## What it does
+## Features
 
-Submit a URL, pick tags, and LogKeep handles the rest: it fetches the page, extracts the title and content, generates an AI summary (optional), and commits a formatted entry to a GitHub-hosted LogSeq graph. Designed for quick capture from mobile.
+- Invite-only multi-user access
+- Asynchronous extraction and processing pipeline
+- Optional summarization via OpenAI-compatible API
+- Per-user GitHub repository integration
+- Tagging, analytics, and Prometheus metrics (`/metrics`)
 
-- **Invite-only registration** — multi-user, each user has their own GitHub repo and tag collection
-- **Background processing** — extraction and GitHub commits happen asynchronously after submission
-- **AI summarization** — optional, via a local Ollama instance; GPU-accelerated if available
-- **Tag management** — personal tag collections with autocomplete
-- **Analytics** — score and tag usage histograms on the data page
-- **Prometheus metrics** — exposed at `/metrics`
-
-## Development
+## Local Development
 
 ### Prerequisites
 
-- Docker and Docker Compose
-- A GitHub PAT with `repo` scope (for GitHub integration)
+- Docker with Compose support
+- Python 3.12 (for local CLI usage outside containers)
 
-### Running locally
+### Start the stack
 
 ```bash
 git clone https://github.com/gperdrizet/logkeep.git
 cd logkeep
-cp docker/.env.example docker/.env.development
-# Edit docker/.env.development — set SESSION_SECRET, ENCRYPTION_KEY, database credentials
+make setup
+```
+
+Edit `docker/.env` after `make setup` creates it from `docker/.env.example`.
+
+Generate required secrets:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))"
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Run locally:
+
+```bash
 make dev
 ```
 
-Generate the required secret values:
+App URL: `http://localhost:8000`
 
-```bash
-# ENCRYPTION_KEY
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-
-# SESSION_SECRET
-python -c "import secrets; print(secrets.token_urlsafe(32))"
-```
-
-Initialize and create the first user:
+### Local bootstrap
 
 ```bash
 docker exec -it logkeep python -m src.cli.admin init-db
 docker exec -it logkeep python -m src.cli.admin create-invite
-docker exec -it logkeep python -m src.cli.admin create-user
 ```
 
-App is available at `http://localhost:8000`.
+## Environment Configuration
 
-### LLM summarization (optional)
+Environment templates:
 
-Set in `.env.development`:
+- `docker/.env.example` (local)
+- `docker/.env.staging.example`
+- `docker/.env.production.example`
 
-```bash
-LLM_ENABLED=true
-LLM_BASE_URL=http://ollama:11434
-LLM_MODEL_NAME=hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF
-SUMMARIZE_ON_SUBMIT=true
-```
+Core required security values in each environment:
 
-The `make dev` compose file includes an Ollama container. An NVIDIA GPU with `nvidia-container-toolkit` is required for GPU acceleration; CPU inference works without it.
+- `SESSION_SECRET`
+- `ENCRYPTION_KEY`
+
+LLM summarization is enabled when all three values are configured:
+
+- `LLM_BASE_URL`
+- `LLM_API_KEY`
+- `LLM_MODEL_NAME`
 
 ## Deployment
 
-### CI/CD overview
+Current CI/CD workflows:
 
-Three GitHub Actions workflows manage the pipeline:
-
-| Workflow | Trigger | What it does |
+| Workflow | Trigger | Purpose |
 |---|---|---|
-| `test.yml` | PR to `main` | Runs pytest — blocks merge on failure |
-| `deploy-staging.yml` | Push to `main` | Deploys to staging server via SSH |
-| `deploy-production.yml` | Manual (`workflow_dispatch`) | Deploys to production, creates GitHub release |
+| `.github/workflows/test.yml` | Pull request to `main` | Installs dependencies and runs tests if present |
+| `.github/workflows/deploy-staging.yml` | Push to `main` (or manual) | Deploys to staging and runs health check |
+| `.github/workflows/deploy-production.yml` | Manual (`workflow_dispatch`) | Deploys pinned commit SHA to production, verifies health, tags and releases |
 
-Required GitHub secrets: `VPS_SSH_PRIVATE_KEY`, `VPS_HOST`, `VPS_USER`.
+Required GitHub secrets:
 
-### Staging
+- `VPS_SSH_PRIVATE_KEY`
+- `VPS_HOST`
+- `VPS_USER`
 
-Staging deploys automatically on every push to `main`. The environment is accessible on the tailnet at `http://100.64.0.1:8003`.
+Production deploy requires workflow inputs:
 
-### Production
+- `version` (release tag value)
+- `confirm=deploy`
 
-Trigger manually from the **Actions** tab → **Deploy to Production**. Inputs:
+## CLI
 
-- `version` — release version (e.g. `1.2.0`)
-- `confirm` — must type `deploy` to proceed
-
-The workflow deploys, runs a health check, tags the commit, and creates a GitHub release.
-
-### Initializing a new deployment
-
-After the first deploy, the database schema needs to be created and at least one invite code generated before anyone can register:
+Run commands inside app container:
 
 ```bash
-# Replace logkeep-staging with logkeep for production
-docker exec logkeep-staging python -m src.cli.admin init-db
-docker exec logkeep-staging python -m src.cli.admin create-invite
+docker exec <container> python -m src.cli.admin <command>
 ```
 
-Subsequent deploys run `init-db` automatically (it is idempotent).
+Common commands:
 
-## CLI reference
+- `init-db`
+- `create-invite [--count N]`
+- `create-user`
+- `list-users`
+- `activate-user <username>`
+- `deactivate-user <username>`
+- `test-github <username>`
+- `backfill-summaries <username>`
 
-All commands: `docker exec <container> python -m src.cli.admin <command>`
+## Project Docs
 
-```bash
-# Database
-init-db                              # Create tables (safe to re-run)
-
-# Users
-create-user                          # Interactive: username, password, GitHub PAT, repo
-list-users                           # Show all users and status
-activate-user <username>             # Re-enable a deactivated account
-deactivate-user <username>           # Disable login for a user
-test-github <username>               # Verify GitHub token and repo access
-
-# Invites
-create-invite [--count N]            # Generate N invite codes (default: 1)
-list-invites [--unused]              # List all or only unused codes
-
-# Summaries
-backfill-summaries <username>        # Generate summaries for links that don't have one
-```
+See [docs/README.md](docs/README.md) for deployment, operations, and environment references.

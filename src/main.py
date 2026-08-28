@@ -80,16 +80,21 @@ async def metrics_middleware(request: Request, call_next):
     
     duration = time.time() - start_time
     
+    # Use the matched route template (not the raw path) so unmatched/scanned
+    # URLs collapse into one label instead of creating unbounded time series
+    route = request.scope.get("route")
+    endpoint_label = route.path if route else "unmatched"
+    
     # Record metrics
     REQUEST_COUNT.labels(
         method=request.method,
-        endpoint=request.url.path,
+        endpoint=endpoint_label,
         status=response.status_code
     ).inc()
     
     REQUEST_DURATION.labels(
         method=request.method,
-        endpoint=request.url.path
+        endpoint=endpoint_label
     ).observe(duration)
     
     return response
