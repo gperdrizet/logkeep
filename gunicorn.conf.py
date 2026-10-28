@@ -24,7 +24,7 @@ max_requests = 1000  # Recycle workers to prevent memory leaks
 max_requests_jitter = 50  # Add randomness to prevent all workers restarting at once
 
 # Timeouts
-timeout = 120  # 2 minutes for long-running summarization tasks
+timeout = 300  # Headroom above LLM_TIMEOUT for long-running summarization tasks
 graceful_timeout = 30  # Allow 30 seconds for graceful shutdown
 keepalive = 5  # Keep connections alive for 5 seconds
 
@@ -59,13 +59,6 @@ def on_starting(server):
     if multiproc_dir:
         shutil.rmtree(multiproc_dir, ignore_errors=True)
         os.makedirs(multiproc_dir, exist_ok=True)
-
-
-def child_exit(server, worker):
-    """Called just after a worker has been exited, in the master process."""
-    if os.getenv("PROMETHEUS_MULTIPROC_DIR"):
-        from prometheus_client import multiprocess
-        multiprocess.mark_process_dead(worker.pid)
 
 
 def on_reload(server):
@@ -116,6 +109,9 @@ def post_request(worker, req, environ, resp):
 def child_exit(server, worker):
     """Called just after a worker has been exited, in the master process."""
     server.log.info(f"Worker exited (pid: {worker.pid})")
+    if os.getenv("PROMETHEUS_MULTIPROC_DIR"):
+        from prometheus_client import multiprocess
+        multiprocess.mark_process_dead(worker.pid)
 
 
 def worker_exit(server, worker):

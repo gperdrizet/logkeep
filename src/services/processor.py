@@ -1,6 +1,7 @@
 """Content extraction and link processing service."""
 from datetime import datetime
 from typing import Optional, Tuple
+import time
 import trafilatura
 from bs4 import BeautifulSoup
 import requests
@@ -9,6 +10,7 @@ from src.config import settings
 from src.models.link import Link
 from src.models import LinkStatus
 from src.utils.logging import logger
+from src.metrics import SUMMARIZATION_COUNT, SUMMARIZATION_DURATION
 
 
 def extract_title_from_url(url: str, timeout: int = None) -> Optional[str]:
@@ -303,9 +305,11 @@ def process_link(link_id: int) -> None:
                         from src.services.llm import get_llm_service
                         
                         llm_service = get_llm_service()
+                        start_time = time.time()
                         success_summary, summary, error_summary = llm_service.summarize(
                             content, link.title, link.url
                         )
+                        duration = time.time() - start_time
                         
                         if success_summary and summary:
                             # Summary generated successfully
@@ -314,12 +318,16 @@ def process_link(link_id: int) -> None:
                             link.llm_model = settings.llm_model_name
                             link.summary_error = None
                             logger.info(f"Link {link_id} summarized successfully")
+                            SUMMARIZATION_COUNT.labels(status="success").inc()
+                            SUMMARIZATION_DURATION.labels(status="success").observe(duration)
                         else:
                             # Initial summarization failed - mark for retry
                             link.summary_retry_count = 1
                             link.summary_last_retry_at = datetime.now()
                             link.summary_error = (error_summary or "Summarization failed")[:500]
                             logger.warning(f"Link {link_id} initial summarization failed, will retry later: {error_summary}")
+                            SUMMARIZATION_COUNT.labels(status="error").inc()
+                            SUMMARIZATION_DURATION.labels(status="error").observe(duration)
                         
                         db.commit()
             

@@ -18,6 +18,7 @@ To enable concurrent summarization (when moving from sequential to parallel proc
 5. Monitor provider latency and adjust max_concurrent_requests accordingly
 """
 from abc import ABC, abstractmethod
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from typing import Optional, Tuple
 from openai import OpenAI, APIConnectionError, APITimeoutError, APIStatusError
 from src.config import settings
@@ -73,6 +74,38 @@ class OpenAICompatibleLLMService(BaseLLMService):
 
     
     def summarize(self, content: str, title: str, url: str) -> Tuple[bool, Optional[str], Optional[str]]:
+        """
+        Generate a summary, enforcing a hard wall-clock deadline.
+        
+        The openai/httpx client's own timeout only bounds idle time between
+        reads, not total request time - a provider that trickles keep-alive
+        bytes during a long generation can make it wait indefinitely. Running
+        the call in a worker thread with future.result(timeout=...) gives an
+        actual upper bound regardless of what the HTTP client does.
+        
+        Args:
+            content: The article content to summarize
+            title: The article title
+            url: The article URL
+            
+        Returns:
+            Tuple of (success, summary, error)
+        """
+        # Not using ThreadPoolExecutor as a context manager on purpose: its
+        # __exit__ calls shutdown(wait=True), which would block here until
+        # the hung call finishes anyway - the opposite of a hard deadline.
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(self._summarize_impl, content, title, url)
+        try:
+            result = future.result(timeout=settings.llm_timeout)
+            executor.shutdown(wait=False)
+            return result
+        except FutureTimeoutError:
+            logger.error("Summarization hard deadline (%ds) exceeded for: %s", settings.llm_timeout, url)
+            executor.shutdown(wait=False)
+            return False, None, "Summarization service timeout"
+
+    def _summarize_impl(self, content: str, title: str, url: str) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         Generate a summary using an OpenAI-compatible chat completion API.
         

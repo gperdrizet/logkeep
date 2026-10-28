@@ -9,6 +9,7 @@ This service runs periodically to retry summarization for links where:
 
 from datetime import datetime, timedelta
 from typing import List
+import time
 from sqlalchemy import and_, or_
 from src.utils.database import SessionLocal
 from src.utils.logging import logger
@@ -16,6 +17,7 @@ from src.models.link import Link
 from src.models import LinkStatus
 from src.config import settings
 from src.services.processor import extract_and_truncate_article
+from src.metrics import SUMMARIZATION_COUNT, SUMMARIZATION_DURATION
 
 
 def get_links_needing_retry() -> List[Link]:
@@ -25,9 +27,13 @@ def get_links_needing_retry() -> List[Link]:
     Returns links where:
     - Link processing completed (content extracted)
     - No summary exists yet
-    - Summary error indicates LLM failure (not content failure)
     - Retry count below limit
     - Enough time passed since last retry
+    
+    Eligibility no longer depends on matching specific words in the stored
+    error message - that made links whose message didn't match (e.g. wording
+    from an older code version) silently fall out of the retry queue forever
+    without ever being marked permanently failed.
     """
     db = SessionLocal()
     try:
@@ -65,13 +71,6 @@ def get_links_needing_retry() -> List[Link]:
             Link.status == LinkStatus.COMPLETED,  # Content extraction succeeded
             Link.summary.is_(None),  # No summary yet
             Link.summary_error.isnot(None),  # Previous attempt failed
-            # Only retry LLM failures, not content extraction failures
-            or_(
-                Link.summary_error.contains("unavailable"),
-                Link.summary_error.contains("timeout"),
-                Link.summary_error.contains("Timeout"),
-                Link.summary_error.contains("service")
-            ),
             Link.summary_retry_count < settings.llm_max_retries,  # Haven't exceeded retries
             or_(*conditions)  # Time-based retry conditions
         ).limit(50).all()  # Process max 50 per run
@@ -119,15 +118,24 @@ def retry_summarizations() -> None:
                 content, extractable, extract_error = extract_and_truncate_article(link.url)
                 
                 if not extractable or not content:
-                    # Content extraction now fails - mark permanently
-                    link.summary_error = extract_error or "Article content unavailable"
+                    # Content extraction still fails - counts as a retry attempt too,
+                    # otherwise a permanently unextractable page retries forever.
+                    link.summary_retry_count += 1
+                    link.summary_last_retry_at = datetime.now()
+                    if link.summary_retry_count >= settings.llm_max_retries:
+                        link.summary_error = f"Failed after {settings.llm_max_retries} retries: {extract_error or 'Article content unavailable'}"
+                        logger.error(f"Link {link.id} content extraction failed permanently after {settings.llm_max_retries} retries")
+                    else:
+                        link.summary_error = extract_error or "Article content unavailable"
+                        logger.warning(f"Link {link.id} content extraction now fails: {extract_error}")
                     db.commit()
-                    logger.warning(f"Link {link.id} content extraction now fails: {extract_error}")
                     failed_count += 1
                     continue
                 
                 # Attempt summarization
+                start_time = time.time()
                 success, summary, error = llm_service.summarize(content, link.title, link.url)
+                duration = time.time() - start_time
                 
                 if success and summary:
                     # Success!
@@ -138,6 +146,8 @@ def retry_summarizations() -> None:
                     link.summary_last_retry_at = datetime.now()
                     db.commit()
                     logger.info(f"Link {link.id} summarized successfully on retry")
+                    SUMMARIZATION_COUNT.labels(status="success").inc()
+                    SUMMARIZATION_DURATION.labels(status="success").observe(duration)
                     success_count += 1
                 else:
                     # Still failing
@@ -152,6 +162,8 @@ def retry_summarizations() -> None:
                         logger.warning(f"Link {link.id} summarization still failing (retry {link.summary_retry_count}/{settings.llm_max_retries}): {error}")
                     
                     db.commit()
+                    SUMMARIZATION_COUNT.labels(status="error").inc()
+                    SUMMARIZATION_DURATION.labels(status="error").observe(duration)
                     failed_count += 1
                     
             except Exception as e:
@@ -160,6 +172,7 @@ def retry_summarizations() -> None:
                 link.summary_last_retry_at = datetime.now()
                 link.summary_error = f"Retry error: {str(e)[:450]}"
                 db.commit()
+                SUMMARIZATION_COUNT.labels(status="error").inc()
                 failed_count += 1
         
         logger.info(f"Summarization retry task completed: {success_count} succeeded, {failed_count} failed")
