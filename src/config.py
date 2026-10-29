@@ -44,7 +44,9 @@ class Settings(BaseSettings):
     request_timeout: int = Field(default=10, env="REQUEST_TIMEOUT")
     
     # LLM Configuration
-    llm_enabled: bool = Field(default=False, env="LLM_ENABLED")
+    # NOTE: `llm_enabled` is intentionally NOT a field — it is a derived @property
+    # (see below) computed from url+key+model. Declaring a field with the same name
+    # would shadow the property and disable the auto-enable logic.
     llm_base_url: str = Field(default="http://ollama:11434", env="LLM_BASE_URL")
     llm_api_key: str = Field(default="", env="LLM_API_KEY")
     llm_model_name: str = Field(default="hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF", env="LLM_MODEL_NAME")

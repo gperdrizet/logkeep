@@ -124,6 +124,29 @@ async def metrics():
 async def startup_event():
     """Application startup tasks."""
     logger.info("Starting LogKeep application...")
+
+    # Summarization is a core capability in deployed environments. If the LLM is
+    # not configured there (LLM_BASE_URL + LLM_API_KEY + LLM_MODEL_NAME), fail fast
+    # with an actionable error instead of silently running with summarization off --
+    # that used to leave completed links stuck at "COMPLETED - SUMMARY PENDING" in a
+    # perpetual dashboard auto-reload loop. Local dev (ENVIRONMENT=development) may
+    # still run without an LLM.
+    if not settings.is_development and not settings.llm_enabled:
+        missing = [
+            name
+            for name, present in (
+                ("LLM_BASE_URL", bool(settings.llm_base_url.strip())),
+                ("LLM_API_KEY", bool(settings.llm_api_key.strip())),
+                ("LLM_MODEL_NAME", bool(settings.llm_model_name.strip())),
+            )
+            if not present
+        ]
+        raise RuntimeError(
+            f"Refusing to start: LLM summarization is required in "
+            f"ENVIRONMENT={settings.environment!r} but is not configured. "
+            f"Missing: {', '.join(missing)}. "
+            "Set LLM_BASE_URL, LLM_API_KEY and LLM_MODEL_NAME."
+        )
     
         # Reset stale processing tasks
     db = SessionLocal()
@@ -407,10 +430,17 @@ async def dashboard(
     for link in links:
         link.tag_names = [tag.name for tag in link.tags]
         # Check if link has pending summary (completed but no summary/error yet)
+        # A completed link is only "pending" a summary while summarization is
+        # actually enabled. When the LLM is off (e.g. local dev without an API key)
+        # a completed link can never produce a summary, so flagging it "pending"
+        # would keep the dashboard in a perpetual auto-reload loop. With
+        # summarization on, every completed link reaches a terminal state
+        # (summary or summary_error), so the pending state is transient.
         link.has_pending_summary = (
-            link.status == LinkStatus.COMPLETED and 
-            link.summary is None and 
-            link.summary_error is None
+            settings.llm_enabled and
+            link.status == LinkStatus.COMPLETED
+            and link.summary is None
+            and link.summary_error is None
         )
         if link.has_pending_summary:
             any_pending_summaries = True
