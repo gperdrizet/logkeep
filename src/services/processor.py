@@ -99,7 +99,7 @@ def extract_title_from_url(url: str, timeout: int = None) -> Optional[str]:
         logger.warning(f"No title found for URL: {url}")
         return None
         
-    except requests.Timeout:
+    except requests.exceptions.Timeout:
         logger.error(f"Timeout extracting title from: {url}")
         return None
     except requests.RequestException as e:
