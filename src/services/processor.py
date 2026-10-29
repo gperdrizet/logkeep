@@ -102,7 +102,7 @@ def extract_title_from_url(url: str, timeout: int = None) -> Optional[str]:
     except requests.exceptions.Timeout:
         logger.error(f"Timeout extracting title from: {url}")
         return None
-    except requests.RequestException as e:
+    except requests.exceptions.RequestException as e:
         logger.error(f"Request error extracting title from {url}: {str(e)}")
         return None
     except Exception as e:
