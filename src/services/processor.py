@@ -15,42 +15,73 @@ from src.utils.logging import logger
 from src.metrics import SUMMARIZATION_COUNT, SUMMARIZATION_DURATION
 
 
+def fetch_page_html(url: str, timeout: int = None):
+    """
+    Fetch raw HTML for a URL, impersonating a real browser to get past bot
+    detection (Cloudflare / Akamai / Incapsula style 403/402 blocks).
+
+    Browsers' TLS fingerprint and HTTP/2 settings (not just the User-Agent
+    string) are what many news sites gate on. ``curl_cffi`` with
+    ``impersonate="chrome"`` reproduces those fingerprints, which a plain
+    ``requests`` call or ``trafilatura``'s built-in downloader will not.
+
+    Args:
+        url: URL to fetch
+        timeout: Request timeout in seconds (uses config default if None)
+
+    Returns:
+        Raw HTML body (bytes) on success, or None if the fetch failed.
+    """
+    if timeout is None:
+        timeout = settings.request_timeout
+
+    try:
+        response = requests.get(url, timeout=timeout, impersonate="chrome")
+        response.raise_for_status()
+        return response.content
+    except requests.exceptions.Timeout:
+        logger.error(f"Timeout fetching page: {url}")
+        return None
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Request error fetching {url}: {str(e)}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error fetching {url}: {str(e)}")
+        return None
+
+
 def extract_title_from_url(url: str, timeout: int = None) -> Optional[str]:
     """
     Extract title from URL using trafilatura with BeautifulSoup fallback.
-    
+
     Args:
         url: URL to extract title from
         timeout: Request timeout in seconds (uses config default if None)
-        
+
     Returns:
         Extracted title or None if extraction fails
     """
-
-    # headers = {
-    #     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    #     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    #     "Accept-Language": "en-US,en;q=0.5",
-    #     "Accept-Encoding": "gzip, deflate, br",
-    #     "Connection": "keep-alive",
-    #     "Upgrade-Insecure-Requests": "1"
-    # }
-
-    if timeout is None:
-        timeout = settings.request_timeout
-    
     try:
-
-        # Get the HTML first
-        response = requests.get(url, timeout=timeout, impersonate="chrome")
-        response.raise_for_status()
-        html_content = response.content
+        # Fetch the HTML with browser impersonation (see fetch_page_html)
+        html_content = fetch_page_html(url)
+        if not html_content:
+            # fetch_page_html already logged the failure
+            logger.warning(f"No HTML available for URL: {url}, cannot extract title")
+            return None
 
         # Try trafilatura first
         logger.info(f'Trying trafilatura for URL: {url}')
 
-        #downloaded = trafilatura.fetch_url(url)
-        downloaded = trafilatura.extract(html_content, include_metadata=True)
+        downloaded = trafilatura.extract(
+            html_content,
+            with_metadata=True,
+            favor_recall="medium",
+            no_fallback=False,
+            include_comments=False,
+            include_tables=False,
+            include_images=False,
+            deduplicate=False
+        )
 
         if downloaded:
             metadata = trafilatura.extract_metadata(downloaded)
@@ -140,12 +171,16 @@ def extract_and_truncate_article(url: str) -> Tuple[Optional[str], bool, Optiona
         Tuple of (content: Optional[str], is_summarizable: bool, error_reason: Optional[str])
     """
     try:
-        # Fetch the page
-        downloaded = trafilatura.fetch_url(url)
+        # Fetch the page with browser impersonation. Using curl_cffi here
+        # (instead of trafilatura.fetch_url) is what lets us get past the
+        # 403/402 bot-detection blocks on major news sites — trafilatura's
+        # internal downloader does not mimic a real browser's TLS/HTTP2
+        # fingerprint and gets rejected.
+        downloaded = fetch_page_html(url)
         if not downloaded:
             logger.warning(f"Failed to fetch URL: {url}")
             return None, False, "Article content unavailable"
-        
+
         # Extract full article content
         content = trafilatura.extract(
             downloaded,
