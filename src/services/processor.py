@@ -4,7 +4,9 @@ from typing import Optional, Tuple
 import time
 import trafilatura
 from bs4 import BeautifulSoup
-import requests
+
+# import requests
+from curl_cffi import requests
 from sqlalchemy.orm import Session
 from src.config import settings
 from src.models.link import Link
@@ -25,22 +27,31 @@ def extract_title_from_url(url: str, timeout: int = None) -> Optional[str]:
         Extracted title or None if extraction fails
     """
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1"
-    }
+    # headers = {
+    #     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    #     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    #     "Accept-Language": "en-US,en;q=0.5",
+    #     "Accept-Encoding": "gzip, deflate, br",
+    #     "Connection": "keep-alive",
+    #     "Upgrade-Insecure-Requests": "1"
+    # }
 
     if timeout is None:
         timeout = settings.request_timeout
     
     try:
+
+        # Get the HTML first
+        response = requests.get(url, timeout=timeout, impersonate="chrome")
+        response.raise_for_status()
+        html_content = response.content
+
         # Try trafilatura first
         logger.info(f'Trying trafilatura for URL: {url}')
-        downloaded = trafilatura.fetch_url(url)
+
+        #downloaded = trafilatura.fetch_url(url)
+        downloaded = trafilatura.extract(html_content, include_metadata=True)
+
         if downloaded:
             metadata = trafilatura.extract_metadata(downloaded)
             if metadata and metadata.title:
@@ -49,10 +60,10 @@ def extract_title_from_url(url: str, timeout: int = None) -> Optional[str]:
         
         # Fallback to BeautifulSoup
         logger.info(f'Trying BeautifulSoup fallback for URL: {url}')
-        response = requests.get(url, timeout=timeout, headers=headers)
-        response.raise_for_status()
+        # response = requests.get(url, timeout=timeout, headers=headers)
+        # response.raise_for_status()
         
-        soup = BeautifulSoup(response.content, 'lxml')
+        soup = BeautifulSoup(html_content, 'lxml')
         
         # Try various title extraction methods
         title = None
