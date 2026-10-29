@@ -29,6 +29,7 @@ def extract_title_from_url(url: str, timeout: int = None) -> Optional[str]:
     
     try:
         # Try trafilatura first
+        logger.info(f'Trying trafilatura for URL: {url}')
         downloaded = trafilatura.fetch_url(url)
         if downloaded:
             metadata = trafilatura.extract_metadata(downloaded)
@@ -37,6 +38,7 @@ def extract_title_from_url(url: str, timeout: int = None) -> Optional[str]:
                 return metadata.title.strip()
         
         # Fallback to BeautifulSoup
+        logger.info(f'Trying BeautifulSoup fallback for URL: {url}')
         response = requests.get(url, timeout=timeout, headers={
             'User-Agent': 'Mozilla/5.0 (compatible; LogKeep/1.0; +https://github.com/gperdrizet/logkeep)'
         })
