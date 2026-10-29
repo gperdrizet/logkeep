@@ -216,16 +216,20 @@ async def startup_event():
         db.close()
     
     # Start scheduled tasks
-    if settings.llm_enabled:
-        # Schedule summarization retry task to run every 20 minutes
+    if settings.llm_enabled and settings.summarize_on_submit:
+        # Summarization (first attempt + all retries) runs on a 1-minute tick.
+        # The per-attempt backoff is applied in retry_summarization.py via
+        # settings.llm_retry_intervals_minutes. Rows are claimed with
+        # FOR UPDATE SKIP LOCKED so the two Gunicorn workers never summarize the
+        # same link at once.
         scheduler.add_job(
             retry_summarizations,
-            trigger=IntervalTrigger(minutes=20),
+            trigger=IntervalTrigger(minutes=1),
             id='retry_summarizations',
-            name='Retry failed summarizations',
+            name='Summarization first-attempt + retries',
             replace_existing=True
         )
-        logger.info("Scheduled summarization retry task (every 20 minutes)")
+        logger.info("Scheduled summarization task (every 1 minute)")
     
     scheduler.start()
     logger.info("LogKeep application started successfully")
@@ -426,21 +430,21 @@ async def dashboard(
         links = all_links
     
     # Add tag_names attribute and check for pending summaries
+    summarization_active = settings.llm_enabled and settings.summarize_on_submit
     any_pending_summaries = False
     for link in links:
         link.tag_names = [tag.name for tag in link.tags]
-        # Check if link has pending summary (completed but no summary/error yet)
-        # A completed link is only "pending" a summary while summarization is
-        # actually enabled. When the LLM is off (e.g. local dev without an API key)
-        # a completed link can never produce a summary, so flagging it "pending"
-        # would keep the dashboard in a perpetual auto-reload loop. With
-        # summarization on, every completed link reaches a terminal state
-        # (summary or summary_error), so the pending state is transient.
+        # A completed link's summary has a derived lifecycle (see
+        # Link.is_summary_pending): done when summary is set, "pending" while
+        # retries remain, and terminal ("given up") once retries are exhausted.
+        # The pending state therefore persists for the whole retry window rather
+        # than only before the first attempt, so the dashboard shows a calm
+        # "Summarizing..." the entire time and never flashes "unavailable" on an
+        # interim failure. Gated on summarization being enabled so a link is never
+        # "pending" forever when the LLM is off.
         link.has_pending_summary = (
-            settings.llm_enabled and
-            link.status == LinkStatus.COMPLETED
-            and link.summary is None
-            and link.summary_error is None
+            summarization_active
+            and link.is_summary_pending(settings.llm_max_retries)
         )
         if link.has_pending_summary:
             any_pending_summaries = True

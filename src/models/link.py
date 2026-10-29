@@ -43,3 +43,19 @@ class Link(Base):
 
     def __repr__(self):
         return f"<Link(id={self.id}, user_id={self.user_id}, url='{self.url[:50]}...', status={self.status.value})>"
+
+    def is_summary_pending(self, max_retries: int) -> bool:
+        """Whether a completed link's summary is still in flight.
+
+        Single source of truth for the summary lifecycle (derived, no extra
+        column). A completed link is in exactly one of three states:
+          - done     -> ``summary`` is set
+          - pending  -> ``summary`` is None and retries remain
+                         (this is the calm "Summarizing..." state)
+          - given up -> ``summary`` is None and retries are exhausted
+        """
+        return (
+            self.status == LinkStatus.COMPLETED
+            and self.summary is None
+            and (self.summary_retry_count or 0) < max_retries
+        )
