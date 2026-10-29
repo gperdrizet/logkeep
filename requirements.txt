@@ -20,6 +20,7 @@ python-multipart==0.0.20
 PyGithub==2.5.0
 
 # Content Extraction
+curl-cffi==0.17.0
 trafilatura==2.0.0
 beautifulsoup4==4.12.3
 lxml==5.3.0
