@@ -24,6 +24,16 @@ def extract_title_from_url(url: str, timeout: int = None) -> Optional[str]:
     Returns:
         Extracted title or None if extraction fails
     """
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1"
+    }
+
     if timeout is None:
         timeout = settings.request_timeout
     
@@ -39,9 +49,7 @@ def extract_title_from_url(url: str, timeout: int = None) -> Optional[str]:
         
         # Fallback to BeautifulSoup
         logger.info(f'Trying BeautifulSoup fallback for URL: {url}')
-        response = requests.get(url, timeout=timeout, headers={
-            'User-Agent': 'Mozilla/5.0 (compatible; LogKeep/1.0; +https://github.com/gperdrizet/logkeep)'
-        })
+        response = requests.get(url, timeout=timeout, headers=headers)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.content, 'lxml')
