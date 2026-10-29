@@ -1,7 +1,6 @@
 """Content extraction and link processing service."""
 from datetime import datetime
 from typing import Optional, Tuple
-import time
 import trafilatura
 from bs4 import BeautifulSoup
 
@@ -12,7 +11,6 @@ from src.config import settings
 from src.models.link import Link
 from src.models import LinkStatus
 from src.utils.logging import logger
-from src.metrics import SUMMARIZATION_COUNT, SUMMARIZATION_DURATION
 
 
 def fetch_page_html(url: str, timeout: int = None):
@@ -330,64 +328,28 @@ def process_link(link_id: int) -> None:
             db.commit()
             logger.info(f"Link {link_id} processed successfully (GitHub disabled)")
         
-        # Only proceed with summarization if link processing succeeded
-        if link.status == LinkStatus.COMPLETED:
-            # Attempt summarization if enabled
-            # NOTE: This is sequential processing. For concurrent processing:
-            # 1. Remove time.sleep delays below
-            # 2. Add asyncio.Semaphore for GPU access control
-            # 3. Use async/await pattern
-            # 4. Increase ThreadPoolExecutor max_workers
-            if settings.llm_enabled and settings.summarize_on_submit:
-                logger.info(f"Attempting to summarize link {link_id}")
-                
-                # Check if URL is summarizable
-                is_summarizable, skip_reason = is_summarizable_url(link.url)
-                if not is_summarizable:
-                    link.summary_error = skip_reason
-                    db.commit()
-                    logger.info(f"Link {link_id} skipped summarization: {skip_reason}")
-                else:
-                    # Extract article content
-                    content, extractable, extract_error = extract_and_truncate_article(link.url)
-                    
-                    if not extractable or not content:
-                        link.summary_error = extract_error or "Article content unavailable"
-                        db.commit()
-                        logger.warning(f"Link {link_id} content extraction failed: {extract_error}")
-                    else:
-                        # Attempt initial summarization (no immediate retries)
-                        # Failed attempts will be retried by the scheduled retry task
-                        from src.services.llm import get_llm_service
-                        
-                        llm_service = get_llm_service()
-                        start_time = time.time()
-                        success_summary, summary, error_summary = llm_service.summarize(
-                            content, link.title, link.url
-                        )
-                        duration = time.time() - start_time
-                        
-                        if success_summary and summary:
-                            # Summary generated successfully
-                            link.summary = summary
-                            link.summarized_at = datetime.now()
-                            link.llm_model = settings.llm_model_name
-                            link.summary_error = None
-                            logger.info(f"Link {link_id} summarized successfully")
-                            SUMMARIZATION_COUNT.labels(status="success").inc()
-                            SUMMARIZATION_DURATION.labels(status="success").observe(duration)
-                        else:
-                            # Initial summarization failed - mark for retry
-                            link.summary_retry_count = 1
-                            link.summary_last_retry_at = datetime.now()
-                            link.summary_error = (error_summary or "Summarization failed")[:500]
-                            logger.warning(f"Link {link_id} initial summarization failed, will retry later: {error_summary}")
-                            SUMMARIZATION_COUNT.labels(status="error").inc()
-                            SUMMARIZATION_DURATION.labels(status="error").observe(duration)
-                        
-                        db.commit()
-            
-            db.commit()
+        # Summarization is handled entirely by the scheduled task
+        # (services/retry_summarization.py), which makes the FIRST attempt within
+        # ~1 minute of completion and owns every subsequent retry. While a link is
+        # waiting it is COMPLETED with summary=None, which the dashboard renders as
+        # a calm "Summarizing..." state (no reload, no flicker). There is no inline
+        # LLM call here, so there is exactly one code path that talks to the LLM.
+        #
+        # Exception: non-summarizable types (e.g. PDFs) can never produce a summary.
+        # We mark them terminal NOW (retry count at the cap) so they are not left
+        # "pending" forever; the retry task already skips any link whose retry count
+        # has reached the cap, so this is consistent with the derived lifecycle.
+        if (
+            link.status == LinkStatus.COMPLETED
+            and settings.llm_enabled
+            and settings.summarize_on_submit
+        ):
+            is_summarizable, skip_reason = is_summarizable_url(link.url)
+            if not is_summarizable:
+                link.summary_error = skip_reason
+                link.summary_retry_count = settings.llm_max_retries
+                db.commit()
+                logger.info(f"Link {link_id} skipped summarization (terminal): {skip_reason}")
         
     except Exception as e:
         logger.error(f"Unexpected error processing link {link_id}: {str(e)}", exc_info=True)

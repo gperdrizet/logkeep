@@ -50,11 +50,16 @@ class Settings(BaseSettings):
     llm_base_url: str = Field(default="http://ollama:11434", env="LLM_BASE_URL")
     llm_api_key: str = Field(default="", env="LLM_API_KEY")
     llm_model_name: str = Field(default="hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF", env="LLM_MODEL_NAME")
-    llm_timeout: int = Field(default=240, env="LLM_TIMEOUT")
+    llm_timeout: int = Field(default=300, env="LLM_TIMEOUT")
     llm_max_input_tokens: int = Field(default=12000, env="LLM_MAX_INPUT_TOKENS")
     llm_max_output_tokens: int = Field(default=1200, env="LLM_MAX_OUTPUT_TOKENS")
-    llm_max_retries: int = Field(default=3, env="LLM_MAX_RETRIES")
-    llm_retry_delays: list = Field(default_factory=lambda: [5, 10, 20])
+    llm_max_retries: int = Field(default=5, env="LLM_MAX_RETRIES")
+    # Minutes to wait before each summarization attempt, indexed by attempt number
+    # (summary_retry_count) in retry_summarization.py. The GPU backend is shared and
+    # busy, which is the usual cause of failure, so we retry responsively at first
+    # and then back off. Worst case the final attempts fall ~2h apart, after which
+    # the link is marked as "couldn't summarize" (terminal).
+    llm_retry_intervals_minutes: list = Field(default_factory=lambda: [2, 5, 15, 30, 60])
     llm_temperature: float = 0.3
     summarize_on_submit: bool = True
     summary_max_length: int = Field(default=2000)
